@@ -579,8 +579,23 @@ function testSpacebarAttackAnimations() {
     const horizontalKickLength = kickFoot
         ? Math.hypot(kickFoot[1].x - kickFoot[0].x, kickFoot[1].y - kickFoot[0].y)
         : 0;
-    if (!kickFoot || kickFoot[1].x >= kickFoot[0].x || Math.abs(horizontalKickLength - 160 * 0.25 * 5) > 0.001) {
-        console.error('Test failed: left kick should extend the leg to five times its normal length');
+    const horizontalUnitX = kickFoot ? (kickFoot[1].x - kickFoot[0].x) / horizontalKickLength : 0;
+    const horizontalUnitY = kickFoot ? (kickFoot[1].y - kickFoot[0].y) / horizontalKickLength : 0;
+    const shoePath = mockCtx.strokeCalls.slice(floorStrokeStart)[5];
+    const shoeLength = shoePath
+        ? (shoePath[1].x - shoePath[0].x) * horizontalUnitX + (shoePath[1].y - shoePath[0].y) * horizontalUnitY
+        : 0;
+    if (!kickFoot || kickFoot[1].x >= kickFoot[0].x || Math.abs(horizontalKickLength - 160 * 0.25 * 5) > 0.001 ||
+        mockCtx.strokeCalls.length - floorStrokeStart !== 6 || Math.abs(shoeLength - 160 * 0.15 * 4) > 0.001) {
+        console.error('Test failed: peak left kick should show a foot twice the head diameter at its tip');
+        teardownMockEnvironment();
+        return false;
+    }
+
+    const nonPeakKickStart = mockCtx.strokeCalls.length;
+    logic.drawStickman(100, 200, 160, 'left', 0, false, { type: 'kick', direction: 'left', frame: 3 });
+    if (mockCtx.strokeCalls.length - nonPeakKickStart !== 5) {
+        console.error('Test failed: kick should show the foot only at peak extension');
         teardownMockEnvironment();
         return false;
     }
@@ -600,13 +615,24 @@ function testSpacebarAttackAnimations() {
     }
 
     const upStrokeStart = mockCtx.strokeCalls.length;
+    const upArcStart = mockCtx.arcCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'punch', direction: 'up', frame: 6 });
     const upPunch = mockCtx.strokeCalls.slice(upStrokeStart)[2];
     const upwardPunchLength = upPunch
         ? Math.hypot(upPunch[1].x - upPunch[0].x, upPunch[1].y - upPunch[0].y)
         : 0;
-    if (!upPunch || upPunch[1].y >= upPunch[0].y || Math.abs(upwardPunchLength - 160 * 0.2 * 5) > 0.001) {
-        console.error('Test failed: upward punch should extend the arm to five times its normal length');
+    const fistArc = mockCtx.arcCalls[upArcStart + 1];
+    if (!upPunch || upPunch[1].y >= upPunch[0].y || Math.abs(upwardPunchLength - 160 * 0.2 * 5) > 0.001 ||
+        !fistArc || Math.abs(fistArc.radius - 160 * 0.15 * 0.7) > 0.001) {
+        console.error('Test failed: peak upward punch should show a fist at its tip');
+        teardownMockEnvironment();
+        return false;
+    }
+
+    const nonPeakPunchArcStart = mockCtx.arcCalls.length;
+    logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'punch', direction: 'up', frame: 3 });
+    if (mockCtx.arcCalls.length - nonPeakPunchArcStart !== 1) {
+        console.error('Test failed: punch should show the fist only at peak extension');
         teardownMockEnvironment();
         return false;
     }

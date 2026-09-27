@@ -164,6 +164,7 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ? ((attack.direction === 'left' || (attack.direction === 'down' && direction === 'left')) ? -1 : 1)
         : (direction === 'left' ? -1 : 1);
     const progress = attack ? Math.sin(Math.PI * attack.frame / ATTACK_DURATION) : 0;
+    let attackTip = null;
 
     for (const side of [-1, 1]) {
         ctx.beginPath();
@@ -178,10 +179,10 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
             const kickTargetY = attack.direction === 'down'
                 ? Math.sqrt(kickLength * kickLength - kickTargetX * kickTargetX)
                 : -legLength * 0.1;
-            ctx.lineTo(
-                centerX + kickStartX + (kickTargetX - kickStartX) * progress,
-                bodyBottomY + kickStartY + (kickTargetY - kickStartY) * progress
-            );
+            const kickEndX = centerX + kickStartX + (kickTargetX - kickStartX) * progress;
+            const kickEndY = bodyBottomY + kickStartY + (kickTargetY - kickStartY) * progress;
+            ctx.lineTo(kickEndX, kickEndY);
+            attackTip = { x: kickEndX, y: kickEndY, originX: centerX, originY: bodyBottomY };
         } else {
             ctx.lineTo(centerX + side * (10 - legOffset), bodyBottomY + legLength);
         }
@@ -194,14 +195,77 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
             const punchY = attack.direction === 'up'
                 ? shoulderY - Math.sqrt(armLength * armLength * 25 - punchHorizontal * punchHorizontal) * progress
                 : shoulderY + armLength * 1.8 * progress;
-            ctx.lineTo(centerX + punchHorizontal, punchY);
+            const punchEndX = centerX + punchHorizontal;
+            ctx.lineTo(punchEndX, punchY);
+            attackTip = { x: punchEndX, y: punchY, originX: centerX, originY: shoulderY };
         } else {
             ctx.lineTo(centerX + side * (armLength - armOffset), shoulderY + armLength * 0.5);
         }
         ctx.stroke();
     }
+
+    if (attackTip && progress >= 0.98) {
+        if (isKicking) {
+            drawFootAtTip(attackTip.x, attackTip.y, attackTip.originX, attackTip.originY, headRadius);
+        } else if (isPunching) {
+            drawFistAtTip(attackTip.x, attackTip.y, attackTip.originX, attackTip.originY, headRadius);
+        }
+    }
     
     ctx.shadowBlur = 0;
+}
+
+function drawFootAtTip(tipX, tipY, originX, originY, headRadius) {
+    const directionX = tipX - originX;
+    const directionY = tipY - originY;
+    const directionLength = Math.hypot(directionX, directionY);
+    if (directionLength === 0) return;
+
+    const unitX = directionX / directionLength;
+    const unitY = directionY / directionLength;
+    const perpendicularX = -unitY;
+    const perpendicularY = unitX;
+    const footLength = headRadius * 4;
+    const halfWidth = headRadius * 0.55;
+    const heelX = tipX - unitX * footLength * 0.2;
+    const heelY = tipY - unitY * footLength * 0.2;
+    const toeX = tipX + unitX * footLength * 0.8;
+    const toeY = tipY + unitY * footLength * 0.8;
+
+    ctx.beginPath();
+    ctx.moveTo(heelX + perpendicularX * halfWidth * 0.65, heelY + perpendicularY * halfWidth * 0.65);
+    ctx.lineTo(toeX + perpendicularX * halfWidth * 0.35, toeY + perpendicularY * halfWidth * 0.35);
+    ctx.lineTo(toeX - perpendicularX * halfWidth * 0.35, toeY - perpendicularY * halfWidth * 0.35);
+    ctx.lineTo(heelX - perpendicularX * halfWidth * 0.65, heelY - perpendicularY * halfWidth * 0.65);
+    ctx.lineTo(heelX + perpendicularX * halfWidth * 0.65, heelY + perpendicularY * halfWidth * 0.65);
+    ctx.stroke();
+}
+
+function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
+    const directionX = tipX - originX;
+    const directionY = tipY - originY;
+    const directionLength = Math.hypot(directionX, directionY);
+    if (directionLength === 0) return;
+
+    const unitX = directionX / directionLength;
+    const unitY = directionY / directionLength;
+    const perpendicularX = -unitY;
+    const perpendicularY = unitX;
+    const fistRadius = headRadius * 0.7;
+
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, fistRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    for (let knuckle = -1; knuckle <= 1; knuckle++) {
+        const offset = knuckle * fistRadius * 0.35;
+        ctx.beginPath();
+        ctx.moveTo(tipX + unitX * fistRadius * 0.1 + perpendicularX * offset,
+            tipY + unitY * fistRadius * 0.1 + perpendicularY * offset);
+        ctx.lineTo(tipX + unitX * fistRadius * 0.55 + perpendicularX * offset,
+            tipY + unitY * fistRadius * 0.55 + perpendicularY * offset);
+        ctx.stroke();
+    }
 }
 
 function isOverLadder(playerX, playerY, ladderArray) {
