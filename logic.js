@@ -11,6 +11,8 @@ const player = {
     animationFrame: 0,
     isMoving: false,
     isClimbing: false,
+    lastClimbDirection: null,
+    attack: null,
     currentFloor: 2
 };
 
@@ -18,8 +20,12 @@ const keys = {
     ArrowLeft: false,
     ArrowRight: false,
     ArrowUp: false,
-    ArrowDown: false
+    ArrowDown: false,
+    Space: false
 };
+
+let spaceWasDown = false;
+const ATTACK_DURATION = 12;
 
 const ladders = [];
 
@@ -113,7 +119,7 @@ function drawLadder(x, y1, y2, width) {
     ctx.shadowBlur = 0;
 }
 
-function drawStickman(x, y, height, direction, animationFrame, isClimbing) {
+function drawStickman(x, y, height, direction, animationFrame, isClimbing, attack = player.attack) {
     const headRadius = height * 0.15;
     const bodyLength = height * 0.4;
     const legLength = height * 0.25;
@@ -151,25 +157,43 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing) {
         armOffset = 0;
     }
     
-    ctx.beginPath();
-    ctx.moveTo(centerX, bodyBottomY);
-    ctx.lineTo(centerX - 10 + legOffset, bodyBottomY + legLength);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(centerX, bodyBottomY);
-    ctx.lineTo(centerX + 10 - legOffset, bodyBottomY + legLength);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(centerX, bodyTopY + bodyLength * 0.3);
-    ctx.lineTo(centerX - armLength + armOffset, bodyTopY + bodyLength * 0.3 + armLength * 0.5);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(centerX, bodyTopY + bodyLength * 0.3);
-    ctx.lineTo(centerX + armLength - armOffset, bodyTopY + bodyLength * 0.3 + armLength * 0.5);
-    ctx.stroke();
+    const shoulderY = bodyTopY + bodyLength * 0.3;
+    const isKicking = attack && attack.type === 'kick';
+    const isPunching = attack && attack.type === 'punch';
+    const activeSide = isKicking
+        ? ((attack.direction === 'left' || (attack.direction === 'down' && direction === 'left')) ? -1 : 1)
+        : (direction === 'left' ? -1 : 1);
+    const progress = attack ? Math.sin(Math.PI * attack.frame / ATTACK_DURATION) : 0;
+
+    for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(centerX, bodyBottomY);
+        if (isKicking && side === activeSide) {
+            if (attack.direction === 'down') {
+                ctx.lineTo(centerX + side * 10, bodyBottomY + legLength * (0.3 + 1.2 * progress));
+            } else {
+                ctx.lineTo(
+                    centerX + side * (10 + legLength * 1.4 * progress),
+                    bodyBottomY + legLength * (0.35 - 0.45 * progress)
+                );
+            }
+        } else {
+            ctx.lineTo(centerX + side * (10 - legOffset), bodyBottomY + legLength);
+        }
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(centerX, shoulderY);
+        if (isPunching && side === activeSide) {
+            const punchY = attack.direction === 'up'
+                ? shoulderY - armLength * progress
+                : shoulderY + armLength * 1.8 * progress;
+            ctx.lineTo(centerX + side * armLength * 0.45, punchY);
+        } else {
+            ctx.lineTo(centerX + side * (armLength - armOffset), shoulderY + armLength * 0.5);
+        }
+        ctx.stroke();
+    }
     
     ctx.shadowBlur = 0;
 }
@@ -259,6 +283,7 @@ function updatePlayer() {
             : (overLadder.y2 - player.height);
         
         if (keys.ArrowUp) {
+            player.lastClimbDirection = 'up';
             if (player.y > topLimit) {
                 player.y = Math.max(topLimit, player.y - player.speed);
                 player.isClimbing = true;
@@ -268,6 +293,7 @@ function updatePlayer() {
         }
         
         if (keys.ArrowDown) {
+            player.lastClimbDirection = 'down';
             if (player.y < bottomLimit) {
                 player.y = Math.min(bottomLimit, player.y + player.speed);
                 player.isClimbing = true;
@@ -278,6 +304,33 @@ function updatePlayer() {
     }
     
     player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+
+    if (keys.Space && !spaceWasDown) {
+        const attackLadder = isOverLadder(player.x, player.y);
+        const insideLadder = attackLadder && (
+            player.isClimbing || keys.ArrowUp || keys.ArrowDown ||
+            (player.y > attackLadder.y1 - player.height + 10 &&
+                player.y < attackLadder.y2 - player.height - 10)
+        );
+        if (insideLadder) {
+            const climbDirection = keys.ArrowUp
+                ? 'up'
+                : (keys.ArrowDown ? 'down' : (player.lastClimbDirection || 'up'));
+            player.attack = climbDirection === 'up'
+                ? { type: 'punch', direction: 'up', frame: 0 }
+                : { type: 'kick', direction: 'down', frame: 0 };
+        } else {
+            player.attack = { type: 'kick', direction: player.direction, frame: 0 };
+        }
+    }
+    spaceWasDown = keys.Space;
+
+    if (player.attack) {
+        player.attack.frame++;
+        if (player.attack.frame >= ATTACK_DURATION) {
+            player.attack = null;
+        }
+    }
     
     if (!player.isClimbing) {
         const closestFloor = findClosestFloor(player.y, floorY);
@@ -315,7 +368,7 @@ function drawGame() {
         drawLadder(ladder.x, ladder.y1, ladder.y2, ladder.width);
     }
     
-    drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing);
+    drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack);
 }
 
 function gameLoop() {
@@ -328,8 +381,9 @@ function gameLoop() {
 
 if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('keydown', (e) => {
-        if (keys.hasOwnProperty(e.key)) {
-            keys[e.key] = true;
+        const key = e.code === 'Space' || e.key === ' ' ? 'Space' : e.key;
+        if (keys.hasOwnProperty(key)) {
+            keys[key] = true;
             if (e.preventDefault) {
                 e.preventDefault();
             }
@@ -337,8 +391,9 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     });
 
     document.addEventListener('keyup', (e) => {
-        if (keys.hasOwnProperty(e.key)) {
-            keys[e.key] = false;
+        const key = e.code === 'Space' || e.key === ' ' ? 'Space' : e.key;
+        if (keys.hasOwnProperty(key)) {
+            keys[key] = false;
         }
     });
 }

@@ -553,6 +553,86 @@ function testLadderFloor2ToFloor1Descending() {
     return true;
 }
 
+function testSpacebarAttackAnimations() {
+    setupMockEnvironment();
+
+    const logic = require('./logic.js');
+    logic.resizeCanvas();
+    logic.player.x = 100;
+    logic.player.direction = 'left';
+    logic.keys.ArrowLeft = false;
+    logic.keys.ArrowRight = false;
+    logic.keys.ArrowUp = false;
+    logic.keys.ArrowDown = false;
+    logic.keys.Space = true;
+    logic.updatePlayer();
+
+    if (!logic.player.attack || logic.player.attack.type !== 'kick' || logic.player.attack.direction !== 'left') {
+        console.error('Test failed: spacebar on a floor should kick in the last horizontal direction');
+        teardownMockEnvironment();
+        return false;
+    }
+
+    const floorStrokeStart = mockCtx.strokeCalls.length;
+    logic.drawStickman(100, 200, 160, 'left', 0, false, { type: 'kick', direction: 'left', frame: 6 });
+    const kickFoot = mockCtx.strokeCalls.slice(floorStrokeStart)[1];
+    if (!kickFoot || kickFoot[1].x >= kickFoot[0].x) {
+        console.error('Test failed: left kick should animate the left leg forward');
+        teardownMockEnvironment();
+        return false;
+    }
+
+    logic.keys.Space = false;
+    logic.updatePlayer();
+    logic.player.x = mockCanvas.width * 0.5;
+    logic.player.y = 150;
+    logic.keys.ArrowUp = true;
+    logic.keys.Space = true;
+    logic.updatePlayer();
+
+    if (!logic.player.attack || logic.player.attack.type !== 'punch' || logic.player.attack.direction !== 'up') {
+        console.error('Test failed: spacebar while climbing upward should punch upward');
+        teardownMockEnvironment();
+        return false;
+    }
+
+    const upStrokeStart = mockCtx.strokeCalls.length;
+    logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'punch', direction: 'up', frame: 6 });
+    const upPunch = mockCtx.strokeCalls.slice(upStrokeStart)[2];
+    if (!upPunch || upPunch[1].y >= upPunch[0].y) {
+        console.error('Test failed: upward punch should animate the arm upward');
+        teardownMockEnvironment();
+        return false;
+    }
+
+    logic.keys.Space = false;
+    logic.keys.ArrowUp = false;
+    logic.keys.ArrowDown = true;
+    logic.updatePlayer();
+    logic.keys.ArrowDown = false;
+    logic.keys.Space = true;
+    logic.updatePlayer();
+
+    if (!logic.player.attack || logic.player.attack.type !== 'kick' || logic.player.attack.direction !== 'down') {
+        console.error('Test failed: spacebar after descending should kick downward');
+        teardownMockEnvironment();
+        return false;
+    }
+
+    const downStrokeStart = mockCtx.strokeCalls.length;
+    logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'kick', direction: 'down', frame: 6 });
+    const downKick = mockCtx.strokeCalls.slice(downStrokeStart)[1];
+    if (!downKick || downKick[1].y <= downKick[0].y) {
+        console.error('Test failed: downward kick should animate the leg downward');
+        teardownMockEnvironment();
+        return false;
+    }
+
+    teardownMockEnvironment();
+    console.log('testSpacebarAttackAnimations passed');
+    return true;
+}
+
 function runAllTests() {
     console.log('Running tests...');
     
@@ -568,6 +648,7 @@ function runAllTests() {
         testSectionHeight(),
         testPlayerHeightAndFloorPositioning(),
         testLadderFloor2ToFloor1Descending(),
+        testSpacebarAttackAnimations(),
         testFindClosestFloor()
     ];
     
@@ -595,6 +676,7 @@ if (typeof module !== 'undefined' && module.exports) {
         testSectionHeight,
         testPlayerHeightAndFloorPositioning,
         testLadderFloor2ToFloor1Descending,
+        testSpacebarAttackAnimations,
         testFindClosestFloor,
         runAllTests
     };
