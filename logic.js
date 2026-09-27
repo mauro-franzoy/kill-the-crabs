@@ -26,6 +26,14 @@ const keys = {
 
 let spaceWasDown = false;
 const ATTACK_DURATION = 12;
+const ATTACK_PEAK_FRAME = 6;
+const EXTREMITY_HOLD_MS = 1000;
+
+function getAnimationTime() {
+    return (typeof performance !== 'undefined' && typeof performance.now === 'function')
+        ? performance.now()
+        : Date.now();
+}
 
 const ladders = [];
 
@@ -119,7 +127,7 @@ function drawLadder(x, y1, y2, width) {
     ctx.shadowBlur = 0;
 }
 
-function drawStickman(x, y, height, direction, animationFrame, isClimbing, attack = player.attack) {
+function drawStickman(x, y, height, direction, animationFrame, isClimbing, attack = player.attack, now = getAnimationTime()) {
     const headRadius = height * 0.15;
     const bodyLength = height * 0.4;
     const legLength = height * 0.25;
@@ -204,7 +212,10 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.stroke();
     }
 
-    if (attackTip && progress >= 0.98) {
+    const peakVisible = attackTip && progress >= 0.98 && (
+        attack.peakTime === null || attack.peakTime === undefined || now - attack.peakTime <= EXTREMITY_HOLD_MS
+    );
+    if (peakVisible) {
         if (isKicking) {
             drawFootAtTip(attackTip.x, attackTip.y, attackTip.originX, attackTip.originY, headRadius);
         } else if (isPunching) {
@@ -227,18 +238,32 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius) {
     const perpendicularY = unitX;
     const footLength = headRadius * 4;
     const halfWidth = headRadius * 0.55;
-    const heelX = tipX - unitX * footLength * 0.2;
-    const heelY = tipY - unitY * footLength * 0.2;
-    const toeX = tipX + unitX * footLength * 0.8;
-    const toeY = tipY + unitY * footLength * 0.8;
+    const heelX = tipX - unitX * footLength * 0.25;
+    const heelY = tipY - unitY * footLength * 0.25;
+    const toeX = tipX + unitX * footLength * 0.75;
+    const toeY = tipY + unitY * footLength * 0.75;
+    const ballX = tipX + unitX * footLength * 0.52;
+    const ballY = tipY + unitY * footLength * 0.52;
 
     ctx.beginPath();
-    ctx.moveTo(heelX + perpendicularX * halfWidth * 0.65, heelY + perpendicularY * halfWidth * 0.65);
+    ctx.moveTo(heelX + perpendicularX * halfWidth * 0.35, heelY + perpendicularY * halfWidth * 0.35);
+    ctx.lineTo(ballX + perpendicularX * halfWidth, ballY + perpendicularY * halfWidth);
     ctx.lineTo(toeX + perpendicularX * halfWidth * 0.35, toeY + perpendicularY * halfWidth * 0.35);
+    ctx.lineTo(toeX, toeY);
     ctx.lineTo(toeX - perpendicularX * halfWidth * 0.35, toeY - perpendicularY * halfWidth * 0.35);
-    ctx.lineTo(heelX - perpendicularX * halfWidth * 0.65, heelY - perpendicularY * halfWidth * 0.65);
-    ctx.lineTo(heelX + perpendicularX * halfWidth * 0.65, heelY + perpendicularY * halfWidth * 0.65);
+    ctx.lineTo(ballX - perpendicularX * halfWidth, ballY - perpendicularY * halfWidth);
+    ctx.lineTo(heelX - perpendicularX * halfWidth * 0.35, heelY - perpendicularY * halfWidth * 0.35);
+    ctx.closePath();
+    ctx.fillStyle = '#FF0000';
+    ctx.fill();
+    ctx.strokeStyle = '#800000';
     ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(ballX - perpendicularX * halfWidth * 0.85, ballY - perpendicularY * halfWidth * 0.85);
+    ctx.lineTo(toeX - perpendicularX * halfWidth * 0.3, toeY - perpendicularY * halfWidth * 0.3);
+    ctx.stroke();
+    ctx.strokeStyle = '#FF0000';
 }
 
 function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
@@ -251,21 +276,40 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
     const unitY = directionY / directionLength;
     const perpendicularX = -unitY;
     const perpendicularY = unitX;
-    const fistRadius = headRadius * 0.7;
+    const fistLength = headRadius * 1.5;
+    const fistHalfWidth = headRadius * 0.6;
+    const wristX = tipX - unitX * fistLength * 0.4;
+    const wristY = tipY - unitY * fistLength * 0.4;
+    const knucklesX = tipX + unitX * fistLength * 0.25;
+    const knucklesY = tipY + unitY * fistLength * 0.25;
 
     ctx.beginPath();
-    ctx.arc(tipX, tipY, fistRadius, 0, Math.PI * 2);
+    ctx.moveTo(wristX + perpendicularX * fistHalfWidth * 0.55, wristY + perpendicularY * fistHalfWidth * 0.55);
+    ctx.lineTo(tipX + perpendicularX * fistHalfWidth, tipY + perpendicularY * fistHalfWidth);
+    ctx.lineTo(knucklesX + perpendicularX * fistHalfWidth * 0.9, knucklesY + perpendicularY * fistHalfWidth * 0.9);
+    ctx.lineTo(knucklesX + unitX * fistLength * 0.2 + perpendicularX * fistHalfWidth * 0.55,
+        knucklesY + unitY * fistLength * 0.2 + perpendicularY * fistHalfWidth * 0.55);
+    ctx.lineTo(knucklesX + unitX * fistLength * 0.2 - perpendicularX * fistHalfWidth * 0.55,
+        knucklesY + unitY * fistLength * 0.2 - perpendicularY * fistHalfWidth * 0.55);
+    ctx.lineTo(knucklesX - perpendicularX * fistHalfWidth * 0.9, knucklesY - perpendicularY * fistHalfWidth * 0.9);
+    ctx.lineTo(tipX - perpendicularX * fistHalfWidth, tipY - perpendicularY * fistHalfWidth);
+    ctx.lineTo(wristX - perpendicularX * fistHalfWidth * 0.55, wristY - perpendicularY * fistHalfWidth * 0.55);
+    ctx.closePath();
+    ctx.fillStyle = '#FF0000';
+    ctx.fill();
+    ctx.strokeStyle = '#800000';
     ctx.stroke();
 
     for (let knuckle = -1; knuckle <= 1; knuckle++) {
-        const offset = knuckle * fistRadius * 0.35;
+        const offset = knuckle * fistHalfWidth * 0.38;
         ctx.beginPath();
-        ctx.moveTo(tipX + unitX * fistRadius * 0.1 + perpendicularX * offset,
-            tipY + unitY * fistRadius * 0.1 + perpendicularY * offset);
-        ctx.lineTo(tipX + unitX * fistRadius * 0.55 + perpendicularX * offset,
-            tipY + unitY * fistRadius * 0.55 + perpendicularY * offset);
+        ctx.moveTo(tipX + unitX * fistLength * 0.02 + perpendicularX * offset,
+            tipY + unitY * fistLength * 0.02 + perpendicularY * offset);
+        ctx.lineTo(tipX + unitX * fistLength * 0.2 + perpendicularX * offset,
+            tipY + unitY * fistLength * 0.2 + perpendicularY * offset);
         ctx.stroke();
     }
+    ctx.strokeStyle = '#FF0000';
 }
 
 function isOverLadder(playerX, playerY, ladderArray) {
@@ -319,7 +363,7 @@ function isNearLadder(playerX, playerY, ladderArray) {
     return false;
 }
 
-function updatePlayer() {
+function updatePlayer(now = getAnimationTime()) {
     player.isMoving = false;
     player.isClimbing = false;
     
@@ -387,18 +431,26 @@ function updatePlayer() {
                 ? 'up'
                 : (keys.ArrowDown ? 'down' : (player.lastClimbDirection || 'up'));
             player.attack = climbDirection === 'up'
-                ? { type: 'punch', direction: 'up', frame: 0 }
-                : { type: 'kick', direction: 'down', frame: 0 };
+                ? { type: 'punch', direction: 'up', frame: 0, peakTime: null }
+                : { type: 'kick', direction: 'down', frame: 0, peakTime: null };
         } else {
-            player.attack = { type: 'kick', direction: player.direction, frame: 0 };
+            player.attack = { type: 'kick', direction: player.direction, frame: 0, peakTime: null };
         }
     }
     spaceWasDown = keys.Space;
 
     if (player.attack) {
-        player.attack.frame++;
-        if (player.attack.frame >= ATTACK_DURATION) {
-            player.attack = null;
+        if (player.attack.peakTime !== null && player.attack.peakTime !== undefined &&
+            now - player.attack.peakTime <= EXTREMITY_HOLD_MS) {
+            player.attack.frame = ATTACK_PEAK_FRAME;
+        } else {
+            player.attack.frame++;
+            if (player.attack.frame === ATTACK_PEAK_FRAME) {
+                player.attack.peakTime = now;
+            }
+            if (player.attack.frame >= ATTACK_DURATION) {
+                player.attack = null;
+            }
         }
     }
     
@@ -426,7 +478,7 @@ function findClosestFloor(playerY, floorY) {
     return closestFloor;
 }
 
-function drawGame() {
+function drawGame(now = getAnimationTime()) {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -438,12 +490,13 @@ function drawGame() {
         drawLadder(ladder.x, ladder.y1, ladder.y2, ladder.width);
     }
     
-    drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack);
+    drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now);
 }
 
-function gameLoop() {
-    updatePlayer();
-    drawGame();
+function gameLoop(timestamp) {
+    const now = typeof timestamp === 'number' ? timestamp : getAnimationTime();
+    updatePlayer(now);
+    drawGame(now);
     if (typeof requestAnimationFrame !== 'undefined') {
         requestAnimationFrame(gameLoop);
     }
