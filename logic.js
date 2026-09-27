@@ -27,7 +27,7 @@ const keys = {
 let spaceWasDown = false;
 const ATTACK_DURATION = 12;
 const ATTACK_PEAK_FRAME = 6;
-const EXTREMITY_HOLD_MS = 1000;
+const EXTREMITY_HOLD_MS = 500;
 
 function getAnimationTime() {
     return (typeof performance !== 'undefined' && typeof performance.now === 'function')
