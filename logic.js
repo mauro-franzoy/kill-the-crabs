@@ -75,9 +75,9 @@ function resizeCanvas() {
 }
 
 function drawFloorLines(sectionHeight) {
-    ctx.strokeStyle = '#00FF00';
+    ctx.strokeStyle = 'lime';
     ctx.lineWidth = 15;
-    ctx.shadowColor = '#00FF00';
+    ctx.shadowColor = 'lime';
     ctx.shadowBlur = 10;
     
     ctx.beginPath();
@@ -105,9 +105,9 @@ function drawLadder(x, y1, y2, width) {
     const rungCount = 4;
     const rungSpacing = (y2 - y1) / (rungCount + 1);
     
-    ctx.strokeStyle = '#0000FF';
+    ctx.strokeStyle = 'blue';
     ctx.lineWidth = 8;
-    ctx.shadowColor = '#0000FF';
+    ctx.shadowColor = 'blue';
     ctx.shadowBlur = 5;
     
     ctx.beginPath();
@@ -137,9 +137,9 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
     const legLength = height * 0.25;
     const armLength = height * 0.2;
     
-    ctx.strokeStyle = '#FF0000';
+    ctx.strokeStyle = 'red';
     ctx.lineWidth = 4;
-    ctx.shadowColor = '#FF0000';
+    ctx.shadowColor = 'red';
     ctx.shadowBlur = 5;
     
     const centerX = x;
@@ -258,16 +258,16 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius) {
     ctx.lineTo(ballX - perpendicularX * halfWidth, ballY - perpendicularY * halfWidth);
     ctx.lineTo(heelX - perpendicularX * halfWidth * 0.35, heelY - perpendicularY * halfWidth * 0.35);
     ctx.closePath();
-    ctx.fillStyle = '#FF0000';
+    ctx.fillStyle = 'red';
     ctx.fill();
-    ctx.strokeStyle = '#800000';
+    ctx.strokeStyle = 'darkred';
     ctx.stroke();
 
     ctx.beginPath();
     ctx.moveTo(ballX - perpendicularX * halfWidth * 0.85, ballY - perpendicularY * halfWidth * 0.85);
     ctx.lineTo(toeX - perpendicularX * halfWidth * 0.3, toeY - perpendicularY * halfWidth * 0.3);
     ctx.stroke();
-    ctx.strokeStyle = '#FF0000';
+    ctx.strokeStyle = 'red';
 }
 
 function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
@@ -299,9 +299,9 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
     ctx.lineTo(tipX - perpendicularX * fistHalfWidth, tipY - perpendicularY * fistHalfWidth);
     ctx.lineTo(wristX - perpendicularX * fistHalfWidth * 0.55, wristY - perpendicularY * fistHalfWidth * 0.55);
     ctx.closePath();
-    ctx.fillStyle = '#FF0000';
+    ctx.fillStyle = 'red';
     ctx.fill();
-    ctx.strokeStyle = '#800000';
+    ctx.strokeStyle = 'darkred';
     ctx.stroke();
 
     for (let knuckle = -1; knuckle <= 1; knuckle++) {
@@ -313,7 +313,7 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
             tipY + unitY * fistLength * 0.2 + perpendicularY * offset);
         ctx.stroke();
     }
-    ctx.strokeStyle = '#FF0000';
+    ctx.strokeStyle = 'red';
 }
 
 function isOverLadder(playerX, playerY, ladderArray) {
@@ -533,12 +533,10 @@ function drawCrab(enemy) {
     const centerY = enemy.y + enemy.height * 0.52;
     const halfWidth = enemy.width / 2;
     const height = enemy.height;
-    const bodyColor = '#8B4513';
-    const outlineColor = '#5C3317';
+    const outlineColor = 'saddlebrown';
 
     ctx.lineWidth = 3;
     ctx.strokeStyle = outlineColor;
-    ctx.fillStyle = bodyColor;
 
     for (const side of [-1, 1]) {
         for (let leg = 0; leg < 3; leg++) {
@@ -565,7 +563,6 @@ function drawCrab(enemy) {
 
         ctx.beginPath();
         ctx.arc(clawX, clawY, height * 0.1, 0, Math.PI * 2);
-        ctx.fill();
         ctx.stroke();
 
         ctx.beginPath();
@@ -578,7 +575,6 @@ function drawCrab(enemy) {
 
     ctx.beginPath();
     ctx.ellipse(centerX, centerY, enemy.width * 0.28, height * 0.25, 0, 0, Math.PI * 2);
-    ctx.fill();
     ctx.stroke();
 
     for (const side of [-1, 1]) {
@@ -588,15 +584,14 @@ function drawCrab(enemy) {
         ctx.moveTo(eyeX, enemy.y + height * 0.36);
         ctx.lineTo(eyeX, eyeY + height * 0.035);
         ctx.stroke();
-        ctx.fillStyle = '#1E140F';
         ctx.beginPath();
         ctx.arc(eyeX, eyeY, height * 0.035, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.stroke();
     }
 }
 
 function drawGame(now = getAnimationTime()) {
-    ctx.fillStyle = '#000000';
+    ctx.fillStyle = 'darkgray';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     const sectionHeight = canvas.height / 3;

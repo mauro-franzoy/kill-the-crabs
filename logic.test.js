@@ -112,8 +112,8 @@ function testDrawFloorLines() {
     
     logic.drawFloorLines(sectionHeight);
     
-    if (mockCtx.strokeStyle !== '#00FF00') {
-        console.error('Test failed: strokeStyle should be #00FF00, got', mockCtx.strokeStyle);
+    if (mockCtx.strokeStyle !== 'lime') {
+        console.error('Test failed: strokeStyle should be lime, got', mockCtx.strokeStyle);
         teardownMockEnvironment();
         return false;
     }
@@ -124,8 +124,8 @@ function testDrawFloorLines() {
         return false;
     }
     
-    if (mockCtx.shadowColor !== '#00FF00') {
-        console.error('Test failed: shadowColor should be #00FF00, got', mockCtx.shadowColor);
+    if (mockCtx.shadowColor !== 'lime') {
+        console.error('Test failed: shadowColor should be lime, got', mockCtx.shadowColor);
         teardownMockEnvironment();
         return false;
     }
@@ -157,8 +157,8 @@ function testDrawLadder() {
     
     logic.drawLadder(x, y1, y2, 20);
     
-    if (mockCtx.strokeStyle !== '#0000FF') {
-        console.error('Test failed: strokeStyle should be #0000FF, got', mockCtx.strokeStyle);
+    if (mockCtx.strokeStyle !== 'blue') {
+        console.error('Test failed: strokeStyle should be blue, got', mockCtx.strokeStyle);
         teardownMockEnvironment();
         return false;
     }
@@ -169,8 +169,8 @@ function testDrawLadder() {
         return false;
     }
     
-    if (mockCtx.shadowColor !== '#0000FF') {
-        console.error('Test failed: shadowColor should be #0000FF, got', mockCtx.shadowColor);
+    if (mockCtx.shadowColor !== 'blue') {
+        console.error('Test failed: shadowColor should be blue, got', mockCtx.shadowColor);
         teardownMockEnvironment();
         return false;
     }
@@ -205,8 +205,8 @@ function testDrawStickman() {
     
     logic.drawStickman(x, y, height, direction, animationFrame, isClimbing);
     
-    if (mockCtx.strokeStyle !== '#FF0000') {
-        console.error('Test failed: strokeStyle should be #FF0000, got', mockCtx.strokeStyle);
+    if (mockCtx.strokeStyle !== 'red') {
+        console.error('Test failed: strokeStyle should be red, got', mockCtx.strokeStyle);
         teardownMockEnvironment();
         return false;
     }
@@ -217,8 +217,8 @@ function testDrawStickman() {
         return false;
     }
     
-    if (mockCtx.shadowColor !== '#FF0000') {
-        console.error('Test failed: shadowColor should be #FF0000, got', mockCtx.shadowColor);
+    if (mockCtx.shadowColor !== 'red') {
+        console.error('Test failed: shadowColor should be red, got', mockCtx.shadowColor);
         teardownMockEnvironment();
         return false;
     }
@@ -361,8 +361,8 @@ function testDrawGame() {
     
     logic.drawGame();
     
-    if (mockCtx.fillStyle !== '#000000') {
-        console.error('Test failed: fillStyle should be #000000, got', mockCtx.fillStyle);
+    if (mockCtx.fillStyle !== 'darkgray') {
+        console.error('Test failed: fillStyle should be darkgray, got', mockCtx.fillStyle);
         teardownMockEnvironment();
         return false;
     }
@@ -460,8 +460,8 @@ function testPlayerHeightAndFloorPositioning() {
         return false;
     }
     
-    if (Math.abs(floorY0 - 586.6666666666666) > 0.001) {
-        console.error('Test failed: floor 0 Y should be 586.67, got', floorY0);
+    if (Math.abs(floorY0 - 571.6666666666666) > 0.001) {
+        console.error('Test failed: floor 0 Y should be 571.67, got', floorY0);
         teardownMockEnvironment();
         return false;
     }
@@ -590,19 +590,19 @@ function testSpacebarAttackAnimations() {
     const floorStrokeStart = mockCtx.strokeCalls.length;
     const footFillStart = mockCtx.fillCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, false, { type: 'kick', direction: 'left', frame: 6 });
-    const kickFoot = mockCtx.strokeCalls.slice(floorStrokeStart)[1];
+    const kickFoot = mockCtx.strokeCalls.slice(floorStrokeStart)[2];
     const horizontalKickLength = kickFoot
         ? Math.hypot(kickFoot[1].x - kickFoot[0].x, kickFoot[1].y - kickFoot[0].y)
         : 0;
     const horizontalUnitX = kickFoot ? (kickFoot[1].x - kickFoot[0].x) / horizontalKickLength : 0;
     const horizontalUnitY = kickFoot ? (kickFoot[1].y - kickFoot[0].y) / horizontalKickLength : 0;
-    const shoePath = mockCtx.strokeCalls.slice(floorStrokeStart)[5];
+    const shoePath = mockCtx.strokeCalls.slice(floorStrokeStart)[6];
     const shoeLength = shoePath
         ? (shoePath[2].x - shoePath[0].x) * horizontalUnitX + (shoePath[2].y - shoePath[0].y) * horizontalUnitY
         : 0;
     const shoeFill = mockCtx.fillCalls[footFillStart];
     if (!kickFoot || kickFoot[1].x >= kickFoot[0].x || Math.abs(horizontalKickLength - 160 * 0.25 * 5) > 0.001 ||
-        !shoeFill || shoeFill.fillStyle !== '#FF0000' || mockCtx.fillCalls.length - footFillStart !== 1 ||
+        !shoeFill || shoeFill.fillStyle !== 'red' || mockCtx.fillCalls.length - footFillStart !== 1 ||
         Math.abs(shoeLength - 160 * 0.15 * 4) > 0.001) {
         console.error('Test failed: peak left kick should show a foot twice the head diameter at its tip');
         teardownMockEnvironment();
@@ -612,7 +612,7 @@ function testSpacebarAttackAnimations() {
     const nonPeakKickStart = mockCtx.strokeCalls.length;
     const nonPeakFootFillStart = mockCtx.fillCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, false, { type: 'kick', direction: 'left', frame: 3 });
-    if (mockCtx.strokeCalls.length - nonPeakKickStart !== 5 || mockCtx.fillCalls.length !== nonPeakFootFillStart) {
+    if (mockCtx.strokeCalls.length - nonPeakKickStart !== 6 || mockCtx.fillCalls.length !== nonPeakFootFillStart) {
         console.error('Test failed: kick should show the foot only at peak extension');
         teardownMockEnvironment();
         return false;
@@ -635,13 +635,13 @@ function testSpacebarAttackAnimations() {
     const upStrokeStart = mockCtx.strokeCalls.length;
     const upFillStart = mockCtx.fillCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'punch', direction: 'up', frame: 6 });
-    const upPunch = mockCtx.strokeCalls.slice(upStrokeStart)[2];
+    const upPunch = mockCtx.strokeCalls.slice(upStrokeStart)[3];
     const upwardPunchLength = upPunch
         ? Math.hypot(upPunch[1].x - upPunch[0].x, upPunch[1].y - upPunch[0].y)
         : 0;
     const fistFill = mockCtx.fillCalls[upFillStart];
     if (!upPunch || upPunch[1].y >= upPunch[0].y || Math.abs(upwardPunchLength - 160 * 0.2 * 5) > 0.001 ||
-        !fistFill || fistFill.fillStyle !== '#FF0000' || fistFill.path.length < 9 ||
+        !fistFill || fistFill.fillStyle !== 'red' || fistFill.path.length < 9 ||
         mockCtx.fillCalls.length - upFillStart !== 1) {
         console.error('Test failed: peak upward punch should show a fist at its tip');
         teardownMockEnvironment();
@@ -672,7 +672,7 @@ function testSpacebarAttackAnimations() {
 
     const downStrokeStart = mockCtx.strokeCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'kick', direction: 'down', frame: 6 });
-    const downKick = mockCtx.strokeCalls.slice(downStrokeStart)[1];
+    const downKick = mockCtx.strokeCalls.slice(downStrokeStart)[2];
     const downwardKickLength = downKick
         ? Math.hypot(downKick[1].x - downKick[0].x, downKick[1].y - downKick[0].y)
         : 0;
@@ -771,18 +771,19 @@ function testEnemySpawningAndDrawing() {
 
         const fillStart = mockCtx.fillCalls.length;
         const ellipseStart = mockCtx.ellipseCalls.length;
+        const strokeStart = mockCtx.strokeCalls.length;
         logic.drawCrab(firstEnemy);
-        const crabFills = mockCtx.fillCalls.slice(fillStart);
-        if (!crabFills.some(call => call.fillStyle === '#8B4513') ||
-            mockCtx.ellipseCalls.length - ellipseStart !== 1) {
-            console.error('Test failed: crab should draw a brown filled shell');
+        if (mockCtx.fillCalls.length !== fillStart ||
+            mockCtx.ellipseCalls.length - ellipseStart !== 1 ||
+            mockCtx.strokeStyle !== "saddlebrown" ||
+            mockCtx.strokeCalls.length === strokeStart) {
+            console.error("Test failed: crab should draw as a hollow brown outline");
             return false;
         }
-
-        const gameFillStart = mockCtx.fillCalls.length;
+        const gameStrokeStart = mockCtx.strokeCalls.length;
         logic.drawGame(11000);
-        if (!mockCtx.fillCalls.slice(gameFillStart).some(call => call.fillStyle === '#8B4513')) {
-            console.error('Test failed: drawGame should render spawned crabs');
+        if (mockCtx.strokeCalls.length <= gameStrokeStart || mockCtx.fillStyle !== 'darkgray') {
+            console.error("Test failed: drawGame should render hollow crabs on a dark gray background");
             return false;
         }
     } finally {
