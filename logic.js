@@ -32,11 +32,11 @@ function resizeCanvas() {
     player.height = ladderHeight * 0.8;
     
     if (player.currentFloor === 2) {
-        player.y = sectionHeight - player.height - 15;
+        player.y = sectionHeight - player.height;
     } else if (player.currentFloor === 1) {
-        player.y = sectionHeight * 2 - player.height - 15;
+        player.y = sectionHeight * 2 - player.height;
     } else {
-        player.y = canvas.height - player.height - 15;
+        player.y = canvas.height - 15 - player.height;
     }
     
     ladders.length = 0;
@@ -211,9 +211,9 @@ function updatePlayer() {
     
     const sectionHeight = canvas.height / 3;
     const floorY = {
-        2: sectionHeight - player.height - 15,
-        1: sectionHeight * 2 - player.height - 15,
-        0: canvas.height - player.height - 15
+        2: sectionHeight - player.height,
+        1: sectionHeight * 2 - player.height,
+        0: canvas.height - 15 - player.height
     };
     
     const overLadder = isOverLadder(player.x);

@@ -273,27 +273,30 @@ function testFindClosestFloor() {
     
     const logic = require('./logic.js');
     
+    const sectionHeight = mockCanvas.height / 3;
+    const playerHeight = sectionHeight * 0.8;
+    
     const floorY = {
-        2: 100,
-        1: 300,
-        0: 500
+        2: sectionHeight - playerHeight,
+        1: sectionHeight * 2 - playerHeight,
+        0: mockCanvas.height - 15 - playerHeight
     };
     
-    const closestFloor2 = logic.findClosestFloor(120, floorY);
+    const closestFloor2 = logic.findClosestFloor(floorY[2] + 20, floorY);
     if (closestFloor2 !== 2) {
         console.error('Test failed: closest floor should be 2, got', closestFloor2);
         teardownMockEnvironment();
         return false;
     }
     
-    const closestFloor1 = logic.findClosestFloor(310, floorY);
+    const closestFloor1 = logic.findClosestFloor(floorY[1] + 20, floorY);
     if (closestFloor1 !== 1) {
         console.error('Test failed: closest floor should be 1, got', closestFloor1);
         teardownMockEnvironment();
         return false;
     }
     
-    const closestFloor0 = logic.findClosestFloor(510, floorY);
+    const closestFloor0 = logic.findClosestFloor(floorY[0] + 20, floorY);
     if (closestFloor0 !== 0) {
         console.error('Test failed: closest floor should be 0, got', closestFloor0);
         teardownMockEnvironment();
@@ -406,7 +409,7 @@ function testSectionHeight() {
     return true;
 }
 
-function testPlayerHeight() {
+function testPlayerHeightAndFloorPositioning() {
     setupMockEnvironment();
     
     const sectionHeight = mockCanvas.height / 3;
@@ -419,8 +422,54 @@ function testPlayerHeight() {
         return false;
     }
     
+    const floorY2 = sectionHeight - playerHeight;
+    const floorY1 = sectionHeight * 2 - playerHeight;
+    const floorY0 = mockCanvas.height - 15 - playerHeight;
+    
+    if (floorY2 !== 53.33333333333334) {
+        console.error('Test failed: floor 2 Y should be 53.33, got', floorY2);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    if (floorY1 !== 320) {
+        console.error('Test failed: floor 1 Y should be 320, got', floorY1);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    if (floorY0 !== 586.6666666666666) {
+        console.error('Test failed: floor 0 Y should be 586.67, got', floorY0);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const playerBottomOnFloor2 = floorY2 + playerHeight;
+    const floor2Y = sectionHeight;
+    if (playerBottomOnFloor2 !== floor2Y) {
+        console.error('Test failed: player bottom should touch floor 2, got', playerBottomOnFloor2);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const playerBottomOnFloor1 = floorY1 + playerHeight;
+    const floor1Y = sectionHeight * 2;
+    if (playerBottomOnFloor1 !== floor1Y) {
+        console.error('Test failed: player bottom should touch floor 1, got', playerBottomOnFloor1);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const playerBottomOnFloor0 = floorY0 + playerHeight;
+    const floor0Y = mockCanvas.height - 15;
+    if (playerBottomOnFloor0 !== floor0Y) {
+        console.error('Test failed: player bottom should touch floor 0, got', playerBottomOnFloor0);
+        teardownMockEnvironment();
+        return false;
+    }
+    
     teardownMockEnvironment();
-    console.log('testPlayerHeight passed');
+    console.log('testPlayerHeightAndFloorPositioning passed');
     return true;
 }
 
@@ -437,7 +486,7 @@ function runAllTests() {
         testDrawGame(),
         testLadderPositioning(),
         testSectionHeight(),
-        testPlayerHeight(),
+        testPlayerHeightAndFloorPositioning(),
         testFindClosestFloor()
     ];
     
@@ -463,7 +512,7 @@ if (typeof module !== 'undefined' && module.exports) {
         testDrawGame,
         testLadderPositioning,
         testSectionHeight,
-        testPlayerHeight,
+        testPlayerHeightAndFloorPositioning,
         testFindClosestFloor,
         runAllTests 
     };
