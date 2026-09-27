@@ -169,14 +169,19 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.beginPath();
         ctx.moveTo(centerX, bodyBottomY);
         if (isKicking && side === activeSide) {
-            if (attack.direction === 'down') {
-                ctx.lineTo(centerX + side * 10, bodyBottomY + legLength * (0.3 + 1.2 * progress));
-            } else {
-                ctx.lineTo(
-                    centerX + side * (10 + legLength * 1.4 * progress),
-                    bodyBottomY + legLength * (0.35 - 0.45 * progress)
-                );
-            }
+            const kickLength = legLength * 5;
+            const kickStartX = side * 10;
+            const kickStartY = legLength;
+            const kickTargetX = attack.direction === 'down'
+                ? side * legLength * 0.2
+                : side * Math.sqrt(kickLength * kickLength - legLength * legLength * 0.01);
+            const kickTargetY = attack.direction === 'down'
+                ? Math.sqrt(kickLength * kickLength - kickTargetX * kickTargetX)
+                : -legLength * 0.1;
+            ctx.lineTo(
+                centerX + kickStartX + (kickTargetX - kickStartX) * progress,
+                bodyBottomY + kickStartY + (kickTargetY - kickStartY) * progress
+            );
         } else {
             ctx.lineTo(centerX + side * (10 - legOffset), bodyBottomY + legLength);
         }
@@ -185,10 +190,11 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.beginPath();
         ctx.moveTo(centerX, shoulderY);
         if (isPunching && side === activeSide) {
+            const punchHorizontal = side * armLength * 0.45;
             const punchY = attack.direction === 'up'
-                ? shoulderY - armLength * progress
+                ? shoulderY - Math.sqrt(armLength * armLength * 25 - punchHorizontal * punchHorizontal) * progress
                 : shoulderY + armLength * 1.8 * progress;
-            ctx.lineTo(centerX + side * armLength * 0.45, punchY);
+            ctx.lineTo(centerX + punchHorizontal, punchY);
         } else {
             ctx.lineTo(centerX + side * (armLength - armOffset), shoulderY + armLength * 0.5);
         }

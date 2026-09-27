@@ -576,8 +576,11 @@ function testSpacebarAttackAnimations() {
     const floorStrokeStart = mockCtx.strokeCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, false, { type: 'kick', direction: 'left', frame: 6 });
     const kickFoot = mockCtx.strokeCalls.slice(floorStrokeStart)[1];
-    if (!kickFoot || kickFoot[1].x >= kickFoot[0].x) {
-        console.error('Test failed: left kick should animate the left leg forward');
+    const horizontalKickLength = kickFoot
+        ? Math.hypot(kickFoot[1].x - kickFoot[0].x, kickFoot[1].y - kickFoot[0].y)
+        : 0;
+    if (!kickFoot || kickFoot[1].x >= kickFoot[0].x || Math.abs(horizontalKickLength - 160 * 0.25 * 5) > 0.001) {
+        console.error('Test failed: left kick should extend the leg to five times its normal length');
         teardownMockEnvironment();
         return false;
     }
@@ -599,8 +602,11 @@ function testSpacebarAttackAnimations() {
     const upStrokeStart = mockCtx.strokeCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'punch', direction: 'up', frame: 6 });
     const upPunch = mockCtx.strokeCalls.slice(upStrokeStart)[2];
-    if (!upPunch || upPunch[1].y >= upPunch[0].y) {
-        console.error('Test failed: upward punch should animate the arm upward');
+    const upwardPunchLength = upPunch
+        ? Math.hypot(upPunch[1].x - upPunch[0].x, upPunch[1].y - upPunch[0].y)
+        : 0;
+    if (!upPunch || upPunch[1].y >= upPunch[0].y || Math.abs(upwardPunchLength - 160 * 0.2 * 5) > 0.001) {
+        console.error('Test failed: upward punch should extend the arm to five times its normal length');
         teardownMockEnvironment();
         return false;
     }
@@ -622,8 +628,11 @@ function testSpacebarAttackAnimations() {
     const downStrokeStart = mockCtx.strokeCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'kick', direction: 'down', frame: 6 });
     const downKick = mockCtx.strokeCalls.slice(downStrokeStart)[1];
-    if (!downKick || downKick[1].y <= downKick[0].y) {
-        console.error('Test failed: downward kick should animate the leg downward');
+    const downwardKickLength = downKick
+        ? Math.hypot(downKick[1].x - downKick[0].x, downKick[1].y - downKick[0].y)
+        : 0;
+    if (!downKick || downKick[1].y <= downKick[0].y || Math.abs(downwardKickLength - 160 * 0.25 * 5) > 0.001) {
+        console.error('Test failed: downward kick should extend the leg to five times its normal length');
         teardownMockEnvironment();
         return false;
     }
