@@ -36,6 +36,10 @@ function getAnimationTime() {
 }
 
 const ladders = [];
+const enemies = [];
+const ENEMY_SPAWN_INTERVAL_MS = 5000;
+const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
+let lastEnemySpawnTime = null;
 
 function resizeCanvas() {
     canvas.width = window.innerWidth;
@@ -478,6 +482,119 @@ function findClosestFloor(playerY, floorY) {
     return closestFloor;
 }
 
+function updateEnemies(now = getAnimationTime()) {
+    if (lastEnemySpawnTime === null) {
+        lastEnemySpawnTime = now;
+        return;
+    }
+    if (now - lastEnemySpawnTime < ENEMY_SPAWN_INTERVAL_MS) return;
+
+    lastEnemySpawnTime = now;
+    const enemyHeight = player.height / 2;
+    const enemyWidth = enemyHeight * 1.5;
+    if (enemyHeight <= 0 || enemyWidth > canvas.width) return;
+
+    const minX = enemyWidth / 2;
+    const maxX = canvas.width - enemyWidth / 2;
+    const playerCenterX = player.x + player.width / 2;
+    const ladderWidth = ladders.length > 0 ? ladders[0].width : 40;
+    const clearance = ladderWidth * ENEMY_CLEARANCE_LADDER_WIDTHS;
+    const validRanges = [
+        [minX, Math.min(maxX, playerCenterX - clearance)],
+        [Math.max(minX, playerCenterX + clearance), maxX]
+    ].filter(([start, end]) => end >= start);
+    const totalRange = validRanges.reduce((sum, [start, end]) => sum + end - start, 0);
+    if (totalRange <= 0) return;
+
+    let randomX = Math.random() * totalRange;
+    let enemyX = minX;
+    for (const [start, end] of validRanges) {
+        const rangeLength = end - start;
+        if (randomX <= rangeLength) {
+            enemyX = start + randomX;
+            break;
+        }
+        randomX -= rangeLength;
+    }
+
+    const sectionHeight = canvas.height / 3;
+    const floorSurfaces = [sectionHeight, sectionHeight * 2, canvas.height - 15];
+    const floorSurface = floorSurfaces[Math.floor(Math.random() * floorSurfaces.length)];
+    enemies.push({
+        x: enemyX,
+        y: floorSurface - enemyHeight,
+        width: enemyWidth,
+        height: enemyHeight
+    });
+}
+
+function drawCrab(enemy) {
+    const centerX = enemy.x;
+    const centerY = enemy.y + enemy.height * 0.52;
+    const halfWidth = enemy.width / 2;
+    const height = enemy.height;
+    const bodyColor = '#8B4513';
+    const outlineColor = '#5C3317';
+
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = outlineColor;
+    ctx.fillStyle = bodyColor;
+
+    for (const side of [-1, 1]) {
+        for (let leg = 0; leg < 3; leg++) {
+            const attachX = centerX + side * enemy.width * 0.17;
+            const attachY = enemy.y + height * (0.52 + leg * 0.055);
+            const jointX = centerX + side * enemy.width * (0.31 + leg * 0.015);
+            const jointY = enemy.y + height * (0.61 + leg * 0.07);
+            const footX = centerX + side * enemy.width * 0.44;
+            const footY = enemy.y + height * (0.86 + leg * 0.05);
+            ctx.beginPath();
+            ctx.moveTo(attachX, attachY);
+            ctx.lineTo(jointX, jointY);
+            ctx.lineTo(footX, footY);
+            ctx.stroke();
+        }
+
+        const clawX = centerX + side * enemy.width * 0.42;
+        const clawY = enemy.y + height * 0.29;
+        ctx.beginPath();
+        ctx.moveTo(centerX + side * enemy.width * 0.18, enemy.y + height * 0.43);
+        ctx.lineTo(centerX + side * enemy.width * 0.31, enemy.y + height * 0.34);
+        ctx.lineTo(clawX, clawY);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(clawX, clawY, height * 0.1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(clawX + side * height * 0.06, clawY - height * 0.02);
+        ctx.lineTo(clawX + side * height * 0.13, clawY - height * 0.09);
+        ctx.moveTo(clawX + side * height * 0.06, clawY + height * 0.02);
+        ctx.lineTo(clawX + side * height * 0.13, clawY + height * 0.09);
+        ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY, enemy.width * 0.28, height * 0.25, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    for (const side of [-1, 1]) {
+        const eyeX = centerX + side * enemy.width * 0.08;
+        const eyeY = enemy.y + height * 0.23;
+        ctx.beginPath();
+        ctx.moveTo(eyeX, enemy.y + height * 0.36);
+        ctx.lineTo(eyeX, eyeY + height * 0.035);
+        ctx.stroke();
+        ctx.fillStyle = '#1E140F';
+        ctx.beginPath();
+        ctx.arc(eyeX, eyeY, height * 0.035, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
 function drawGame(now = getAnimationTime()) {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -489,6 +606,10 @@ function drawGame(now = getAnimationTime()) {
     for (const ladder of ladders) {
         drawLadder(ladder.x, ladder.y1, ladder.y2, ladder.width);
     }
+
+    for (const enemy of enemies) {
+        drawCrab(enemy);
+    }
     
     drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now);
 }
@@ -496,6 +617,7 @@ function drawGame(now = getAnimationTime()) {
 function gameLoop(timestamp) {
     const now = typeof timestamp === 'number' ? timestamp : getAnimationTime();
     updatePlayer(now);
+    updateEnemies(now);
     drawGame(now);
     if (typeof requestAnimationFrame !== 'undefined') {
         requestAnimationFrame(gameLoop);
@@ -526,6 +648,7 @@ if (typeof module !== 'undefined' && module.exports) {
         player,
         keys,
         ladders,
+        enemies,
         resizeCanvas,
         drawFloorLines,
         drawLadder,
@@ -533,6 +656,8 @@ if (typeof module !== 'undefined' && module.exports) {
         isOverLadder,
         isNearLadder,
         updatePlayer,
+        updateEnemies,
+        drawCrab,
         findClosestFloor,
         drawGame
     };

@@ -23,6 +23,7 @@ function setupMockEnvironment() {
         fillCalls: [],
         strokeCalls: [],
         arcCalls: [],
+        ellipseCalls: [],
         
         beginPath: function() {
             this.currentPath = [];
@@ -59,6 +60,10 @@ function setupMockEnvironment() {
         
         arc: function(x, y, radius, startAngle, endAngle) {
             this.arcCalls.push({ x, y, radius, startAngle, endAngle });
+        },
+
+        ellipse: function(x, y, radiusX, radiusY, rotation, startAngle, endAngle) {
+            this.ellipseCalls.push({ x, y, radiusX, radiusY, rotation, startAngle, endAngle });
         },
         
         getContext: function() {
@@ -717,6 +722,78 @@ function testSpacebarAttackAnimations() {
     return true;
 }
 
+function testEnemySpawningAndDrawing() {
+    setupMockEnvironment();
+
+    const logic = require('./logic.js');
+    logic.resizeCanvas();
+    logic.player.x = 590;
+    logic.enemies.length = 0;
+    const originalRandom = Math.random;
+    Math.random = function() { return 0.25; };
+
+    try {
+        logic.updateEnemies(1000);
+        logic.updateEnemies(5999);
+        if (logic.enemies.length !== 0) {
+            console.error('Test failed: enemies should spawn only after five seconds');
+            return false;
+        }
+
+        logic.updateEnemies(6000);
+        if (logic.enemies.length !== 1) {
+            console.error('Test failed: one enemy should spawn after five seconds');
+            return false;
+        }
+
+        const firstEnemy = logic.enemies[0];
+        const firstPosition = { x: firstEnemy.x, y: firstEnemy.y };
+        const playerCenterX = logic.player.x + logic.player.width / 2;
+        const minimumDistance = logic.ladders[0].width * 4;
+        const sectionHeight = mockCanvas.height / 3;
+        if (firstEnemy.height !== logic.player.height / 2 ||
+            Math.abs(firstEnemy.x - playerCenterX) < minimumDistance ||
+            Math.abs(firstEnemy.y + firstEnemy.height - sectionHeight) > 0.001) {
+            console.error('Test failed: crab should be half player height, on a floor, and far enough from player');
+            return false;
+        }
+
+        logic.updateEnemies(10999);
+        if (logic.enemies.length !== 1) {
+            console.error('Test failed: no second enemy should spawn before the next five-second interval');
+            return false;
+        }
+        logic.updateEnemies(11000);
+        if (logic.enemies.length !== 2 || firstEnemy.x !== firstPosition.x || firstEnemy.y !== firstPosition.y) {
+            console.error('Test failed: another enemy should spawn while existing enemies stay still');
+            return false;
+        }
+
+        const fillStart = mockCtx.fillCalls.length;
+        const ellipseStart = mockCtx.ellipseCalls.length;
+        logic.drawCrab(firstEnemy);
+        const crabFills = mockCtx.fillCalls.slice(fillStart);
+        if (!crabFills.some(call => call.fillStyle === '#8B4513') ||
+            mockCtx.ellipseCalls.length - ellipseStart !== 1) {
+            console.error('Test failed: crab should draw a brown filled shell');
+            return false;
+        }
+
+        const gameFillStart = mockCtx.fillCalls.length;
+        logic.drawGame(11000);
+        if (!mockCtx.fillCalls.slice(gameFillStart).some(call => call.fillStyle === '#8B4513')) {
+            console.error('Test failed: drawGame should render spawned crabs');
+            return false;
+        }
+    } finally {
+        Math.random = originalRandom;
+        teardownMockEnvironment();
+    }
+
+    console.log('testEnemySpawningAndDrawing passed');
+    return true;
+}
+
 function runAllTests() {
     console.log('Running tests...');
     
@@ -733,6 +810,7 @@ function runAllTests() {
         testPlayerHeightAndFloorPositioning(),
         testLadderFloor2ToFloor1Descending(),
         testSpacebarAttackAnimations(),
+        testEnemySpawningAndDrawing(),
         testFindClosestFloor()
     ];
     
@@ -761,6 +839,7 @@ if (typeof module !== 'undefined' && module.exports) {
         testPlayerHeightAndFloorPositioning,
         testLadderFloor2ToFloor1Descending,
         testSpacebarAttackAnimations,
+        testEnemySpawningAndDrawing,
         testFindClosestFloor,
         runAllTests
     };
