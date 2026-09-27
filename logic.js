@@ -7,11 +7,7 @@ function resizeCanvas() {
     drawGame();
 }
 
-function drawGame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    const sectionHeight = canvas.height / 3;
-    
+function drawFloorLines(sectionHeight) {
     ctx.strokeStyle = '#00FF00';
     ctx.lineWidth = 15;
     ctx.shadowColor = '#00FF00';
@@ -33,6 +29,60 @@ function drawGame() {
     ctx.stroke();
     
     ctx.shadowBlur = 0;
+}
+
+function drawLadder(x, y1, y2, width) {
+    const ladderWidth = 40;
+    const leftX = x - ladderWidth / 2;
+    const rightX = x + ladderWidth / 2;
+    const rungCount = 4;
+    const rungSpacing = (y2 - y1) / (rungCount + 1);
+    
+    ctx.strokeStyle = '#0000FF';
+    ctx.lineWidth = 8;
+    ctx.shadowColor = '#0000FF';
+    ctx.shadowBlur = 5;
+    
+    ctx.beginPath();
+    ctx.moveTo(leftX, y1);
+    ctx.lineTo(leftX, y2);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(rightX, y1);
+    ctx.lineTo(rightX, y2);
+    ctx.stroke();
+    
+    for (let i = 1; i <= rungCount; i++) {
+        const rungY = y1 + rungSpacing * i;
+        ctx.beginPath();
+        ctx.moveTo(leftX, rungY);
+        ctx.lineTo(rightX, rungY);
+        ctx.stroke();
+    }
+    
+    ctx.shadowBlur = 0;
+}
+
+function drawGame() {
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    const sectionHeight = canvas.height / 3;
+    
+    drawFloorLines(sectionHeight);
+    
+    drawLadder(canvas.width * 0.2, sectionHeight * 2, canvas.height, 20);
+    drawLadder(canvas.width * 0.5, sectionHeight, sectionHeight * 2, 20);
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        resizeCanvas,
+        drawFloorLines,
+        drawLadder,
+        drawGame
+    };
 }
 
 window.addEventListener('resize', resizeCanvas);
