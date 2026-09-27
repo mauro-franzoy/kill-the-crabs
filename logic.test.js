@@ -725,47 +725,117 @@ function testSpacebarAttackAnimations() {
 function testEnemySpawningAndDrawing() {
     setupMockEnvironment();
 
-    const logic = require('./logic.js');
+    const logic = require("./logic.js");
     logic.resizeCanvas();
     logic.player.x = 590;
     logic.enemies.length = 0;
+    let randomValue = 0.25;
     const originalRandom = Math.random;
-    Math.random = function() { return 0.25; };
+    Math.random = function() { return randomValue; };
 
     try {
         logic.updateEnemies(1000);
         logic.updateEnemies(5999);
         if (logic.enemies.length !== 0) {
-            console.error('Test failed: enemies should spawn only after five seconds');
+            console.error("Test failed: enemies should spawn only after five seconds");
             return false;
         }
 
         logic.updateEnemies(6000);
         if (logic.enemies.length !== 1) {
-            console.error('Test failed: one enemy should spawn after five seconds');
+            console.error("Test failed: one enemy should spawn after five seconds");
             return false;
         }
 
         const firstEnemy = logic.enemies[0];
-        const firstPosition = { x: firstEnemy.x, y: firstEnemy.y };
         const playerCenterX = logic.player.x + logic.player.width / 2;
         const minimumDistance = logic.ladders[0].width * 4;
         const sectionHeight = mockCanvas.height / 3;
         if (firstEnemy.height !== logic.player.height / 2 ||
             Math.abs(firstEnemy.x - playerCenterX) < minimumDistance ||
             Math.abs(firstEnemy.y + firstEnemy.height - sectionHeight) > 0.001) {
-            console.error('Test failed: crab should be half player height, on a floor, and far enough from player');
+            console.error("Test failed: crab should be half player height, on a floor, and far enough from player");
             return false;
         }
 
         logic.updateEnemies(10999);
         if (logic.enemies.length !== 1) {
-            console.error('Test failed: no second enemy should spawn before the next five-second interval');
+            console.error("Test failed: no second enemy should spawn before the next five-second interval");
             return false;
         }
+        const firstXBeforeSpawn = firstEnemy.x;
         logic.updateEnemies(11000);
-        if (logic.enemies.length !== 2 || firstEnemy.x !== firstPosition.x || firstEnemy.y !== firstPosition.y) {
-            console.error('Test failed: another enemy should spawn while existing enemies stay still');
+        if (logic.enemies.length !== 2 ||
+            Math.abs(firstEnemy.x - firstXBeforeSpawn - logic.player.speed / 2) > 0.001) {
+            console.error("Test failed: another crab should spawn and existing crabs should chase at half player speed");
+            return false;
+        }
+
+        const secondEnemy = logic.enemies[1];
+        logic.player.isClimbing = true;
+        randomValue = 0.25;
+        const firstRoamStartX = firstEnemy.x;
+        logic.updateEnemies(11001);
+        if (firstEnemy.roamDirection !== -1 ||
+            Math.abs(firstEnemy.x - (firstRoamStartX - logic.player.speed / 2)) > 0.001) {
+            console.error("Test failed: crab should randomly roam left at half player speed while the player climbs");
+            return false;
+        }
+
+        randomValue = 0.75;
+        secondEnemy.isRoaming = false;
+        const secondRoamStartX = secondEnemy.x;
+        logic.updateEnemies(11002);
+        if (firstEnemy.roamDirection !== -1 ||
+            secondEnemy.roamDirection !== 1 ||
+            Math.abs(firstEnemy.x - (firstRoamStartX - logic.player.speed)) > 0.001 ||
+            Math.abs(secondEnemy.x - (secondRoamStartX + logic.player.speed / 2)) > 0.001) {
+            console.error("Test failed: roaming direction should persist and be randomized independently");
+            return false;
+        }
+
+        const leftEdge = firstEnemy.width / 2;
+        firstEnemy.x = leftEdge + 1;
+        firstEnemy.roamDirection = -1;
+        firstEnemy.isRoaming = true;
+        logic.updateEnemies(11003);
+        if (firstEnemy.x !== leftEdge || firstEnemy.roamDirection !== 1) {
+            console.error("Test failed: roaming crab should reverse at the left canvas edge");
+            return false;
+        }
+        logic.updateEnemies(11004);
+        if (Math.abs(firstEnemy.x - (leftEdge + logic.player.speed / 2)) > 0.001) {
+            console.error("Test failed: crab should head back from the left edge");
+            return false;
+        }
+
+        const rightEdge = mockCanvas.width - firstEnemy.width / 2;
+        firstEnemy.x = rightEdge - 1;
+        firstEnemy.roamDirection = 1;
+        firstEnemy.isRoaming = true;
+        logic.updateEnemies(11005);
+        if (firstEnemy.x !== rightEdge || firstEnemy.roamDirection !== -1) {
+            console.error("Test failed: roaming crab should reverse at the right canvas edge");
+            return false;
+        }
+        logic.updateEnemies(11006);
+        if (Math.abs(firstEnemy.x - (rightEdge - logic.player.speed / 2)) > 0.001) {
+            console.error("Test failed: crab should head back from the right edge");
+            return false;
+        }
+
+        logic.player.isClimbing = false;
+        firstEnemy.x = playerCenterX - 10;
+        firstEnemy.isRoaming = true;
+        logic.updateEnemies(11007);
+        if (firstEnemy.isRoaming || Math.abs(firstEnemy.x - (playerCenterX - 10 + logic.player.speed / 2)) > 0.001) {
+            console.error("Test failed: crab should pursue a grounded player at half speed");
+            return false;
+        }
+        firstEnemy.x = playerCenterX - 1;
+        logic.updateEnemies(11008);
+        if (firstEnemy.x !== playerCenterX) {
+            console.error("Test failed: crab should stop at the player instead of overshooting");
             return false;
         }
 
@@ -781,8 +851,8 @@ function testEnemySpawningAndDrawing() {
             return false;
         }
         const gameStrokeStart = mockCtx.strokeCalls.length;
-        logic.drawGame(11000);
-        if (mockCtx.strokeCalls.length <= gameStrokeStart || mockCtx.fillStyle !== 'darkgray') {
+        logic.drawGame(11008);
+        if (mockCtx.strokeCalls.length <= gameStrokeStart || mockCtx.fillStyle !== "darkgray") {
             console.error("Test failed: drawGame should render hollow crabs on a dark gray background");
             return false;
         }
@@ -791,10 +861,9 @@ function testEnemySpawningAndDrawing() {
         teardownMockEnvironment();
     }
 
-    console.log('testEnemySpawningAndDrawing passed');
+    console.log("testEnemySpawningAndDrawing passed");
     return true;
 }
-
 function runAllTests() {
     console.log('Running tests...');
     

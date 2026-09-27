@@ -485,49 +485,77 @@ function findClosestFloor(playerY, floorY) {
 function updateEnemies(now = getAnimationTime()) {
     if (lastEnemySpawnTime === null) {
         lastEnemySpawnTime = now;
-        return;
-    }
-    if (now - lastEnemySpawnTime < ENEMY_SPAWN_INTERVAL_MS) return;
+    } else if (now - lastEnemySpawnTime >= ENEMY_SPAWN_INTERVAL_MS) {
+        lastEnemySpawnTime = now;
+        const enemyHeight = player.height / 2;
+        const enemyWidth = enemyHeight * 1.5;
+        if (enemyHeight > 0 && enemyWidth <= canvas.width) {
+            const minX = enemyWidth / 2;
+            const maxX = canvas.width - enemyWidth / 2;
+            const playerCenterX = player.x + player.width / 2;
+            const ladderWidth = ladders.length > 0 ? ladders[0].width : 40;
+            const clearance = ladderWidth * ENEMY_CLEARANCE_LADDER_WIDTHS;
+            const validRanges = [
+                [minX, Math.min(maxX, playerCenterX - clearance)],
+                [Math.max(minX, playerCenterX + clearance), maxX]
+            ].filter(([rangeStart, rangeEnd]) => rangeEnd >= rangeStart);
+            const totalRange = validRanges.reduce((sum, [rangeStart, rangeEnd]) => sum + rangeEnd - rangeStart, 0);
+            if (totalRange > 0) {
+                let randomX = Math.random() * totalRange;
+                let enemyX = minX;
+                for (const [rangeStart, rangeEnd] of validRanges) {
+                    const rangeLength = rangeEnd - rangeStart;
+                    if (randomX <= rangeLength) {
+                        enemyX = rangeStart + randomX;
+                        break;
+                    }
+                    randomX -= rangeLength;
+                }
 
-    lastEnemySpawnTime = now;
-    const enemyHeight = player.height / 2;
-    const enemyWidth = enemyHeight * 1.5;
-    if (enemyHeight <= 0 || enemyWidth > canvas.width) return;
-
-    const minX = enemyWidth / 2;
-    const maxX = canvas.width - enemyWidth / 2;
-    const playerCenterX = player.x + player.width / 2;
-    const ladderWidth = ladders.length > 0 ? ladders[0].width : 40;
-    const clearance = ladderWidth * ENEMY_CLEARANCE_LADDER_WIDTHS;
-    const validRanges = [
-        [minX, Math.min(maxX, playerCenterX - clearance)],
-        [Math.max(minX, playerCenterX + clearance), maxX]
-    ].filter(([start, end]) => end >= start);
-    const totalRange = validRanges.reduce((sum, [start, end]) => sum + end - start, 0);
-    if (totalRange <= 0) return;
-
-    let randomX = Math.random() * totalRange;
-    let enemyX = minX;
-    for (const [start, end] of validRanges) {
-        const rangeLength = end - start;
-        if (randomX <= rangeLength) {
-            enemyX = start + randomX;
-            break;
+                const sectionHeight = canvas.height / 3;
+                const floorSurfaces = [sectionHeight, sectionHeight * 2, canvas.height - 15];
+                const floorSurface = floorSurfaces[Math.floor(Math.random() * floorSurfaces.length)];
+                enemies.push({
+                    x: enemyX,
+                    y: floorSurface - enemyHeight,
+                    width: enemyWidth,
+                    height: enemyHeight,
+                    roamDirection: null,
+                    isRoaming: false
+                });
+            }
         }
-        randomX -= rangeLength;
     }
 
-    const sectionHeight = canvas.height / 3;
-    const floorSurfaces = [sectionHeight, sectionHeight * 2, canvas.height - 15];
-    const floorSurface = floorSurfaces[Math.floor(Math.random() * floorSurfaces.length)];
-    enemies.push({
-        x: enemyX,
-        y: floorSurface - enemyHeight,
-        width: enemyWidth,
-        height: enemyHeight
-    });
-}
+    const movementSpeed = player.speed / 2;
+    const playerCenterX = player.x + player.width / 2;
+    const shouldRoam = player.isClimbing;
 
+    for (const enemy of enemies) {
+        const minX = enemy.width / 2;
+        const maxX = canvas.width - enemy.width / 2;
+
+        if (shouldRoam) {
+            if (!enemy.isRoaming) {
+                enemy.roamDirection = Math.random() < 0.5 ? -1 : 1;
+                enemy.isRoaming = true;
+            }
+            enemy.x += enemy.roamDirection * movementSpeed;
+            if (enemy.x <= minX) {
+                enemy.x = minX;
+                enemy.roamDirection = 1;
+            } else if (enemy.x >= maxX) {
+                enemy.x = maxX;
+                enemy.roamDirection = -1;
+            }
+        } else {
+            enemy.isRoaming = false;
+            const distanceToPlayer = playerCenterX - enemy.x;
+            enemy.x += Math.sign(distanceToPlayer) * Math.min(movementSpeed, Math.abs(distanceToPlayer));
+            enemy.x = Math.max(minX, Math.min(maxX, enemy.x));
+        }
+    }
+}
 function drawCrab(enemy) {
     const centerX = enemy.x;
     const centerY = enemy.y + enemy.height * 0.52;
