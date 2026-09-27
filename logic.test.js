@@ -6,7 +6,10 @@ let originalDocument = null;
 function setupMockEnvironment() {
     mockCanvas = {
         width: 1200,
-        height: 800
+        height: 800,
+        getContext: function() {
+            return mockCtx;
+        }
     };
     
     mockCtx = {
@@ -59,7 +62,8 @@ function setupMockEnvironment() {
     
     global.window = {
         innerWidth: 1200,
-        innerHeight: 800
+        innerHeight: 800,
+        addEventListener: function() {}
     };
     
     global.document = {
@@ -68,9 +72,11 @@ function setupMockEnvironment() {
                 return mockCanvas;
             }
             return null;
-        }
+        },
+        addEventListener: function() {}
     };
     
+    global.requestAnimationFrame = function() {};
     global.canvas = mockCanvas;
     global.ctx = mockCtx;
 }
@@ -78,8 +84,10 @@ function setupMockEnvironment() {
 function teardownMockEnvironment() {
     global.window = originalWindow;
     global.document = originalDocument;
+    delete global.requestAnimationFrame;
     delete global.canvas;
     delete global.ctx;
+    try { delete require.cache[require.resolve("./logic.js")]; } catch(e){}
 }
 
 function testDrawFloorLines() {
@@ -416,7 +424,7 @@ function testPlayerHeightAndFloorPositioning() {
     const ladderHeight = sectionHeight;
     const playerHeight = ladderHeight * 0.8;
     
-    if (playerHeight !== 213.33333333333334) {
+    if (Math.abs(playerHeight - 213.33333333333334) > 0.001) {
         console.error('Test failed: player height should be 213.33, got', playerHeight);
         teardownMockEnvironment();
         return false;
@@ -426,7 +434,7 @@ function testPlayerHeightAndFloorPositioning() {
     const floorY1 = sectionHeight * 2 - playerHeight;
     const floorY0 = mockCanvas.height - 15 - playerHeight;
     
-    if (floorY2 !== 53.33333333333334) {
+    if (Math.abs(floorY2 - 53.33333333333334) > 0.001) {
         console.error('Test failed: floor 2 Y should be 53.33, got', floorY2);
         teardownMockEnvironment();
         return false;
@@ -438,7 +446,7 @@ function testPlayerHeightAndFloorPositioning() {
         return false;
     }
     
-    if (floorY0 !== 586.6666666666666) {
+    if (Math.abs(floorY0 - 586.6666666666666) > 0.001) {
         console.error('Test failed: floor 0 Y should be 586.67, got', floorY0);
         teardownMockEnvironment();
         return false;
@@ -473,6 +481,78 @@ function testPlayerHeightAndFloorPositioning() {
     return true;
 }
 
+function testLadderFloor2ToFloor1Descending() {
+    setupMockEnvironment();
+    
+    const logic = require('./logic.js');
+    logic.resizeCanvas();
+    
+    const sectionHeight = mockCanvas.height / 3;
+    const playerHeight = sectionHeight * 0.8;
+    const floor2Y = sectionHeight - playerHeight;
+    const floor1Y = sectionHeight * 2 - playerHeight;
+    const ladderX = mockCanvas.width * 0.5;
+    
+    logic.player.x = ladderX;
+    logic.player.y = floor2Y;
+    logic.player.currentFloor = 2;
+    logic.player.isClimbing = false;
+    logic.keys.ArrowDown = true;
+    logic.keys.ArrowUp = false;
+    logic.keys.ArrowLeft = false;
+    logic.keys.ArrowRight = false;
+    
+    logic.updatePlayer();
+    
+    if (logic.player.y <= floor2Y) {
+        console.error('Test failed: player should have descended from floor 2, got', logic.player.y);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    for (let i = 0; i < 100; i++) {
+        logic.updatePlayer();
+    }
+    
+    if (Math.abs(logic.player.y - floor1Y) > 0.001) {
+        console.error('Test failed: player should be placed over floor 1 Y', floor1Y, 'got', logic.player.y);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const playerBottom = logic.player.y + logic.player.height;
+    const floor1Surface = sectionHeight * 2;
+    if (Math.abs(playerBottom - floor1Surface) > 0.001) {
+        console.error('Test failed: player bottom should touch floor 1, got', playerBottom, 'expected', floor1Surface);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const yAtFloor1 = logic.player.y;
+    for (let i = 0; i < 10; i++) {
+        logic.updatePlayer();
+    }
+    
+    if (logic.player.y !== yAtFloor1) {
+        console.error('Test failed: player should not be able to descend further than floor 1, got', logic.player.y, 'expected', yAtFloor1);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    logic.keys.ArrowDown = false;
+    logic.updatePlayer();
+    
+    if (logic.player.currentFloor !== 1) {
+        console.error('Test failed: player current floor should be 1, got', logic.player.currentFloor);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    teardownMockEnvironment();
+    console.log('testLadderFloor2ToFloor1Descending passed');
+    return true;
+}
+
 function runAllTests() {
     console.log('Running tests...');
     
@@ -487,6 +567,7 @@ function runAllTests() {
         testLadderPositioning(),
         testSectionHeight(),
         testPlayerHeightAndFloorPositioning(),
+        testLadderFloor2ToFloor1Descending(),
         testFindClosestFloor()
     ];
     
@@ -513,9 +594,13 @@ if (typeof module !== 'undefined' && module.exports) {
         testLadderPositioning,
         testSectionHeight,
         testPlayerHeightAndFloorPositioning,
+        testLadderFloor2ToFloor1Descending,
         testFindClosestFloor,
-        runAllTests 
+        runAllTests
     };
+    if (require.main === module) {
+        runAllTests();
+    }
 } else {
     runAllTests();
 }

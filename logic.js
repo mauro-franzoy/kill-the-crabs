@@ -174,16 +174,36 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing) {
     ctx.shadowBlur = 0;
 }
 
-function isOverLadder(playerX, ladderArray) {
+function isOverLadder(playerX, playerY, ladderArray) {
+    let yToCheck = playerY;
+    let laddersToCheck = ladderArray;
+    
+    if (Array.isArray(playerY)) {
+        laddersToCheck = playerY;
+        yToCheck = undefined;
+    }
+    laddersToCheck = laddersToCheck || ladders;
     const ladderTolerance = 30;
-    const laddersToCheck = ladderArray || ladders;
     
     for (const ladder of laddersToCheck) {
         const leftX = ladder.x - ladder.width / 2;
         const rightX = ladder.x + ladder.width / 2;
         
         if (playerX >= leftX - ladderTolerance && playerX <= rightX + ladderTolerance) {
-            return ladder;
+            if (typeof yToCheck === 'number') {
+                const sectionHeight = (typeof canvas !== 'undefined' && canvas && canvas.height) ? canvas.height / 3 : 800 / 3;
+                const canvasHeight = (typeof canvas !== 'undefined' && canvas && canvas.height) ? canvas.height : 800;
+                const pHeight = (typeof player !== 'undefined' && player.height) ? player.height : (sectionHeight * 0.8);
+                const floor0Y = canvasHeight - 15 - pHeight;
+                const topY = ladder.y1 - pHeight;
+                const bottomY = (ladder.y2 >= canvasHeight - 15) ? floor0Y : (ladder.y2 - pHeight);
+                
+                if (yToCheck >= topY - 10 && yToCheck <= bottomY + 10) {
+                    return ladder;
+                }
+            } else {
+                return ladder;
+            }
         }
     }
     return null;
@@ -216,7 +236,7 @@ function updatePlayer() {
         0: canvas.height - 15 - player.height
     };
     
-    const overLadder = isOverLadder(player.x);
+    const overLadder = isOverLadder(player.x, player.y);
     
     if (keys.ArrowLeft) {
         player.x -= player.speed;
@@ -232,18 +252,29 @@ function updatePlayer() {
         player.animationFrame++;
     }
     
-    if (keys.ArrowUp && overLadder) {
-        player.y -= player.speed;
-        player.isClimbing = true;
-        player.isMoving = true;
-        player.animationFrame++;
-    }
-    
-    if (keys.ArrowDown && overLadder) {
-        player.y += player.speed;
-        player.isClimbing = true;
-        player.isMoving = true;
-        player.animationFrame++;
+    if (overLadder) {
+        const topLimit = overLadder.y1 - player.height;
+        const bottomLimit = (overLadder.y2 >= canvas.height - 15)
+            ? floorY[0]
+            : (overLadder.y2 - player.height);
+        
+        if (keys.ArrowUp) {
+            if (player.y > topLimit) {
+                player.y = Math.max(topLimit, player.y - player.speed);
+                player.isClimbing = true;
+                player.isMoving = true;
+                player.animationFrame++;
+            }
+        }
+        
+        if (keys.ArrowDown) {
+            if (player.y < bottomLimit) {
+                player.y = Math.min(bottomLimit, player.y + player.speed);
+                player.isClimbing = true;
+                player.isMoving = true;
+                player.animationFrame++;
+            }
+        }
     }
     
     player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
@@ -290,24 +321,33 @@ function drawGame() {
 function gameLoop() {
     updatePlayer();
     drawGame();
-    requestAnimationFrame(gameLoop);
+    if (typeof requestAnimationFrame !== 'undefined') {
+        requestAnimationFrame(gameLoop);
+    }
 }
 
-document.addEventListener('keydown', (e) => {
-    if (keys.hasOwnProperty(e.key)) {
-        keys[e.key] = true;
-        e.preventDefault();
-    }
-});
+if (typeof document !== 'undefined' && document.addEventListener) {
+    document.addEventListener('keydown', (e) => {
+        if (keys.hasOwnProperty(e.key)) {
+            keys[e.key] = true;
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+        }
+    });
 
-document.addEventListener('keyup', (e) => {
-    if (keys.hasOwnProperty(e.key)) {
-        keys[e.key] = false;
-    }
-});
+    document.addEventListener('keyup', (e) => {
+        if (keys.hasOwnProperty(e.key)) {
+            keys[e.key] = false;
+        }
+    });
+}
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        player,
+        keys,
+        ladders,
         resizeCanvas,
         drawFloorLines,
         drawLadder,
@@ -320,6 +360,10 @@ if (typeof module !== 'undefined' && module.exports) {
     };
 }
 
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
-gameLoop();
+if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('resize', resizeCanvas);
+}
+if (typeof module === "undefined") {
+    resizeCanvas();
+    gameLoop();
+}
