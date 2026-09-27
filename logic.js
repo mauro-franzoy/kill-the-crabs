@@ -520,6 +520,7 @@ function updateEnemies(now = getAnimationTime()) {
                     y: floorSurface - enemyHeight,
                     width: enemyWidth,
                     height: enemyHeight,
+                    floor: 2 - floorSurfaces.indexOf(floorSurface),
                     roamDirection: null,
                     isRoaming: false
                 });
@@ -529,11 +530,10 @@ function updateEnemies(now = getAnimationTime()) {
 
     const movementSpeed = player.speed / 2;
     const playerCenterX = player.x + player.width / 2;
-    const shouldRoam = player.isClimbing;
-
     for (const enemy of enemies) {
         const minX = enemy.width / 2;
         const maxX = canvas.width - enemy.width / 2;
+        const shouldRoam = player.isClimbing || enemy.floor !== player.currentFloor;
 
         if (shouldRoam) {
             if (!enemy.isRoaming) {
@@ -627,7 +627,7 @@ function drawFloorWords(sectionHeight) {
     ];
 
     ctx.fillStyle = 'yellow';
-    ctx.font = 'bold 32px Arial';
+    ctx.font = 'bold 160px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (const floorWord of floorWords) {

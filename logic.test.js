@@ -389,7 +389,7 @@ function testDrawGame() {
     if (words.length !== expectedWords.length || words.some((word, index) =>
         word.text !== expectedWords[index] || word.x !== mockCanvas.width / 2 ||
         Math.abs(word.y - expectedY[index]) > 0.001 || word.fillStyle !== 'yellow' ||
-        word.textAlign !== 'center' || word.textBaseline !== 'middle' || !word.text)) {
+        word.textAlign !== 'center' || word.textBaseline !== 'middle' || word.font !== 'bold 160px Arial' || !word.text)) {
         console.error('Test failed: each floor should show its centered yellow lowercase word');
         teardownMockEnvironment();
         return false;
@@ -839,15 +839,28 @@ function testEnemySpawningAndDrawing() {
         }
 
         logic.player.isClimbing = false;
+        randomValue = 0.25;
+        firstEnemy.floor = logic.player.currentFloor === 2 ? 1 : 2;
+        firstEnemy.x = playerCenterX - 10;
+        firstEnemy.isRoaming = false;
+        const differentFloorStartX = firstEnemy.x;
+        logic.updateEnemies(11007);
+        if (firstEnemy.roamDirection !== -1 ||
+            Math.abs(firstEnemy.x - (differentFloorStartX - logic.player.speed / 2)) > 0.001) {
+            console.error("Test failed: crab should roam instead of following a player on another floor");
+            return false;
+        }
+
+        firstEnemy.floor = logic.player.currentFloor;
         firstEnemy.x = playerCenterX - 10;
         firstEnemy.isRoaming = true;
-        logic.updateEnemies(11007);
+        logic.updateEnemies(11008);
         if (firstEnemy.isRoaming || Math.abs(firstEnemy.x - (playerCenterX - 10 + logic.player.speed / 2)) > 0.001) {
-            console.error("Test failed: crab should pursue a grounded player at half speed");
+            console.error("Test failed: crab should pursue a grounded player on the same floor at half speed");
             return false;
         }
         firstEnemy.x = playerCenterX - 1;
-        logic.updateEnemies(11008);
+        logic.updateEnemies(11009);
         if (firstEnemy.x !== playerCenterX) {
             console.error("Test failed: crab should stop at the player instead of overshooting");
             return false;
@@ -865,7 +878,7 @@ function testEnemySpawningAndDrawing() {
             return false;
         }
         const gameStrokeStart = mockCtx.strokeCalls.length;
-        logic.drawGame(11008);
+        logic.drawGame(11009);
         if (mockCtx.strokeCalls.length <= gameStrokeStart || mockCtx.fillRectCalls[0].fillStyle !== "black") {
             console.error("Test failed: drawGame should render hollow crabs on a black background");
             return false;
