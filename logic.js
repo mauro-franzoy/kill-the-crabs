@@ -556,12 +556,13 @@ function updateEnemies(now = getAnimationTime()) {
         }
     }
 }
+
 function drawCrab(enemy) {
     const centerX = enemy.x;
     const centerY = enemy.y + enemy.height * 0.52;
     const halfWidth = enemy.width / 2;
     const height = enemy.height;
-    const outlineColor = 'saddlebrown';
+    const outlineColor = 'darkgray';
 
     ctx.lineWidth = 3;
     ctx.strokeStyle = outlineColor;
@@ -618,13 +619,30 @@ function drawCrab(enemy) {
     }
 }
 
+function drawFloorWords(sectionHeight) {
+    const floorWords = [
+        { text: 'kill', y: sectionHeight / 2 },
+        { text: 'the', y: sectionHeight * 1.5 },
+        { text: 'crabs', y: (sectionHeight * 2 + canvas.height - 15) / 2 }
+    ];
+
+    ctx.fillStyle = 'yellow';
+    ctx.font = 'bold 32px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const floorWord of floorWords) {
+        ctx.fillText(floorWord.text, canvas.width / 2, floorWord.y);
+    }
+}
+
 function drawGame(now = getAnimationTime()) {
-    ctx.fillStyle = 'darkgray';
+    ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
     const sectionHeight = canvas.height / 3;
     
     drawFloorLines(sectionHeight);
+    drawFloorWords(sectionHeight);
     
     for (const ladder of ladders) {
         drawLadder(ladder.x, ladder.y1, ladder.y2, ladder.width);

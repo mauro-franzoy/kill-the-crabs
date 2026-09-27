@@ -18,8 +18,12 @@ function setupMockEnvironment() {
         shadowColor: null,
         shadowBlur: null,
         fillStyle: null,
+        font: null,
+        textAlign: null,
+        textBaseline: null,
         currentPath: null,
         fillRectCalls: [],
+        fillTextCalls: [],
         fillCalls: [],
         strokeCalls: [],
         arcCalls: [],
@@ -55,7 +59,11 @@ function setupMockEnvironment() {
         },
         
         fillRect: function(x, y, width, height) {
-            this.fillRectCalls.push({ x, y, width, height });
+            this.fillRectCalls.push({ x, y, width, height, fillStyle: this.fillStyle });
+        },
+
+        fillText: function(text, x, y) {
+            this.fillTextCalls.push({ text, x, y, fillStyle: this.fillStyle, font: this.font, textAlign: this.textAlign, textBaseline: this.textBaseline });
         },
         
         arc: function(x, y, radius, startAngle, endAngle) {
@@ -356,31 +364,37 @@ function testResizeCanvas() {
 
 function testDrawGame() {
     setupMockEnvironment();
-    
+
     const logic = require('./logic.js');
-    
     logic.drawGame();
-    
-    if (mockCtx.fillStyle !== 'darkgray') {
-        console.error('Test failed: fillStyle should be darkgray, got', mockCtx.fillStyle);
+
+    const background = mockCtx.fillRectCalls[0];
+    if (!background || background.fillStyle !== 'black' || mockCtx.fillRectCalls.length !== 1) {
+        console.error('Test failed: drawGame should fill the canvas black');
         teardownMockEnvironment();
         return false;
     }
-    
-    if (mockCtx.fillRectCalls.length !== 1) {
-        console.error('Test failed: should have one fillRect call, got', mockCtx.fillRectCalls.length);
+
+    if (background.x !== 0 || background.y !== 0 ||
+        background.width !== mockCanvas.width || background.height !== mockCanvas.height) {
+        console.error('Test failed: black background should cover the entire canvas');
         teardownMockEnvironment();
         return false;
     }
-    
-    const fillCall = mockCtx.fillRectCalls[0];
-    if (fillCall.x !== 0 || fillCall.y !== 0 || 
-        fillCall.width !== mockCanvas.width || fillCall.height !== mockCanvas.height) {
-        console.error('Test failed: fillRect should cover entire canvas');
+
+    const words = mockCtx.fillTextCalls;
+    const expectedWords = ['kill', 'the', 'crabs'];
+    const sectionHeight = mockCanvas.height / 3;
+    const expectedY = [sectionHeight / 2, sectionHeight * 1.5, (sectionHeight * 2 + mockCanvas.height - 15) / 2];
+    if (words.length !== expectedWords.length || words.some((word, index) =>
+        word.text !== expectedWords[index] || word.x !== mockCanvas.width / 2 ||
+        Math.abs(word.y - expectedY[index]) > 0.001 || word.fillStyle !== 'yellow' ||
+        word.textAlign !== 'center' || word.textBaseline !== 'middle' || !word.text)) {
+        console.error('Test failed: each floor should show its centered yellow lowercase word');
         teardownMockEnvironment();
         return false;
     }
-    
+
     teardownMockEnvironment();
     console.log('testDrawGame passed');
     return true;
@@ -845,15 +859,15 @@ function testEnemySpawningAndDrawing() {
         logic.drawCrab(firstEnemy);
         if (mockCtx.fillCalls.length !== fillStart ||
             mockCtx.ellipseCalls.length - ellipseStart !== 1 ||
-            mockCtx.strokeStyle !== "saddlebrown" ||
+            mockCtx.strokeStyle !== "darkgray" ||
             mockCtx.strokeCalls.length === strokeStart) {
-            console.error("Test failed: crab should draw as a hollow brown outline");
+            console.error("Test failed: crab should draw as a hollow dark gray outline");
             return false;
         }
         const gameStrokeStart = mockCtx.strokeCalls.length;
         logic.drawGame(11008);
-        if (mockCtx.strokeCalls.length <= gameStrokeStart || mockCtx.fillStyle !== "darkgray") {
-            console.error("Test failed: drawGame should render hollow crabs on a dark gray background");
+        if (mockCtx.strokeCalls.length <= gameStrokeStart || mockCtx.fillRectCalls[0].fillStyle !== "black") {
+            console.error("Test failed: drawGame should render hollow crabs on a black background");
             return false;
         }
     } finally {
