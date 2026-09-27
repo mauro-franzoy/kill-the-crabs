@@ -179,8 +179,9 @@ function testDrawStickman() {
     const height = 160;
     const direction = 'right';
     const animationFrame = 0;
+    const isClimbing = false;
     
-    logic.drawStickman(x, y, height, direction, animationFrame);
+    logic.drawStickman(x, y, height, direction, animationFrame, isClimbing);
     
     if (mockCtx.strokeStyle !== '#FF0000') {
         console.error('Test failed: strokeStyle should be #FF0000, got', mockCtx.strokeStyle);
@@ -236,6 +237,71 @@ function testIsNearLadder() {
     
     teardownMockEnvironment();
     console.log('testIsNearLadder passed');
+    return true;
+}
+
+function testIsOverLadder() {
+    setupMockEnvironment();
+    
+    const logic = require('./logic.js');
+    
+    const testLadders = [
+        { x: 100, y1: 200, y2: 400, width: 40 }
+    ];
+    
+    const resultOver = logic.isOverLadder(100, testLadders);
+    if (resultOver === null) {
+        console.error('Test failed: should detect ladder when over, got', resultOver);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const resultNotOver = logic.isOverLadder(500, testLadders);
+    if (resultNotOver !== null) {
+        console.error('Test failed: should not detect ladder when not over, got', resultNotOver);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    teardownMockEnvironment();
+    console.log('testIsOverLadder passed');
+    return true;
+}
+
+function testFindClosestFloor() {
+    setupMockEnvironment();
+    
+    const logic = require('./logic.js');
+    
+    const floorY = {
+        2: 100,
+        1: 300,
+        0: 500
+    };
+    
+    const closestFloor2 = logic.findClosestFloor(120, floorY);
+    if (closestFloor2 !== 2) {
+        console.error('Test failed: closest floor should be 2, got', closestFloor2);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const closestFloor1 = logic.findClosestFloor(310, floorY);
+    if (closestFloor1 !== 1) {
+        console.error('Test failed: closest floor should be 1, got', closestFloor1);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const closestFloor0 = logic.findClosestFloor(510, floorY);
+    if (closestFloor0 !== 0) {
+        console.error('Test failed: closest floor should be 0, got', closestFloor0);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    teardownMockEnvironment();
+    console.log('testFindClosestFloor passed');
     return true;
 }
 
@@ -344,10 +410,11 @@ function testPlayerHeight() {
     setupMockEnvironment();
     
     const sectionHeight = mockCanvas.height / 3;
-    const playerHeight = (sectionHeight * 2) * 0.8;
+    const ladderHeight = sectionHeight;
+    const playerHeight = ladderHeight * 0.8;
     
-    if (playerHeight !== 426.6666666666667) {
-        console.error('Test failed: player height should be 426.67, got', playerHeight);
+    if (playerHeight !== 213.33333333333334) {
+        console.error('Test failed: player height should be 213.33, got', playerHeight);
         teardownMockEnvironment();
         return false;
     }
@@ -365,11 +432,13 @@ function runAllTests() {
         testDrawLadder(),
         testDrawStickman(),
         testIsNearLadder(),
+        testIsOverLadder(),
         testResizeCanvas(),
         testDrawGame(),
         testLadderPositioning(),
         testSectionHeight(),
-        testPlayerHeight()
+        testPlayerHeight(),
+        testFindClosestFloor()
     ];
     
     const allPassed = results.every(result => result === true);
@@ -389,11 +458,13 @@ if (typeof module !== 'undefined' && module.exports) {
         testDrawLadder, 
         testDrawStickman,
         testIsNearLadder,
+        testIsOverLadder,
         testResizeCanvas, 
         testDrawGame,
         testLadderPositioning,
         testSectionHeight,
         testPlayerHeight,
+        testFindClosestFloor,
         runAllTests 
     };
 } else {

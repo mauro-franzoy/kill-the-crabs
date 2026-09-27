@@ -2,7 +2,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const player = {
-    x: 100,
+    x: 50,
     y: 0,
     width: 20,
     height: 0,
@@ -10,7 +10,8 @@ const player = {
     direction: 'right',
     animationFrame: 0,
     isMoving: false,
-    isClimbing: false
+    isClimbing: false,
+    currentFloor: 2
 };
 
 const keys = {
@@ -27,8 +28,16 @@ function resizeCanvas() {
     canvas.height = window.innerHeight;
     
     const sectionHeight = canvas.height / 3;
-    player.height = (sectionHeight * 2) * 0.8;
-    player.y = canvas.height - player.height - 15;
+    const ladderHeight = sectionHeight;
+    player.height = ladderHeight * 0.8;
+    
+    if (player.currentFloor === 2) {
+        player.y = sectionHeight - player.height - 15;
+    } else if (player.currentFloor === 1) {
+        player.y = sectionHeight * 2 - player.height - 15;
+    } else {
+        player.y = canvas.height - player.height - 15;
+    }
     
     ladders.length = 0;
     ladders.push({
@@ -104,7 +113,7 @@ function drawLadder(x, y1, y2, width) {
     ctx.shadowBlur = 0;
 }
 
-function drawStickman(x, y, height, direction, animationFrame) {
+function drawStickman(x, y, height, direction, animationFrame, isClimbing) {
     const headRadius = height * 0.15;
     const bodyLength = height * 0.4;
     const legLength = height * 0.25;
@@ -129,7 +138,18 @@ function drawStickman(x, y, height, direction, animationFrame) {
     ctx.lineTo(centerX, bodyBottomY);
     ctx.stroke();
     
-    const legOffset = player.isMoving ? Math.sin(animationFrame * 0.3) * 10 : 0;
+    let legOffset, armOffset;
+    
+    if (isClimbing) {
+        legOffset = Math.sin(animationFrame * 0.4) * 8;
+        armOffset = Math.sin(animationFrame * 0.4) * 12;
+    } else if (player.isMoving) {
+        legOffset = Math.sin(animationFrame * 0.3) * 10;
+        armOffset = Math.sin(animationFrame * 0.3) * 15;
+    } else {
+        legOffset = 0;
+        armOffset = 0;
+    }
     
     ctx.beginPath();
     ctx.moveTo(centerX, bodyBottomY);
@@ -140,8 +160,6 @@ function drawStickman(x, y, height, direction, animationFrame) {
     ctx.moveTo(centerX, bodyBottomY);
     ctx.lineTo(centerX + 10 - legOffset, bodyBottomY + legLength);
     ctx.stroke();
-    
-    const armOffset = player.isMoving ? Math.sin(animationFrame * 0.3) * 15 : 0;
     
     ctx.beginPath();
     ctx.moveTo(centerX, bodyTopY + bodyLength * 0.3);
@@ -154,6 +172,21 @@ function drawStickman(x, y, height, direction, animationFrame) {
     ctx.stroke();
     
     ctx.shadowBlur = 0;
+}
+
+function isOverLadder(playerX, ladderArray) {
+    const ladderTolerance = 30;
+    const laddersToCheck = ladderArray || ladders;
+    
+    for (const ladder of laddersToCheck) {
+        const leftX = ladder.x - ladder.width / 2;
+        const rightX = ladder.x + ladder.width / 2;
+        
+        if (playerX >= leftX - ladderTolerance && playerX <= rightX + ladderTolerance) {
+            return ladder;
+        }
+    }
+    return null;
 }
 
 function isNearLadder(playerX, playerY, ladderArray) {
@@ -176,6 +209,15 @@ function updatePlayer() {
     player.isMoving = false;
     player.isClimbing = false;
     
+    const sectionHeight = canvas.height / 3;
+    const floorY = {
+        2: sectionHeight - player.height - 15,
+        1: sectionHeight * 2 - player.height - 15,
+        0: canvas.height - player.height - 15
+    };
+    
+    const overLadder = isOverLadder(player.x);
+    
     if (keys.ArrowLeft) {
         player.x -= player.speed;
         player.direction = 'left';
@@ -190,14 +232,14 @@ function updatePlayer() {
         player.animationFrame++;
     }
     
-    if (keys.ArrowUp && isNearLadder(player.x, player.y)) {
+    if (keys.ArrowUp && overLadder) {
         player.y -= player.speed;
         player.isClimbing = true;
         player.isMoving = true;
         player.animationFrame++;
     }
     
-    if (keys.ArrowDown && isNearLadder(player.x, player.y)) {
+    if (keys.ArrowDown && overLadder) {
         player.y += player.speed;
         player.isClimbing = true;
         player.isMoving = true;
@@ -205,7 +247,29 @@ function updatePlayer() {
     }
     
     player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+    
+    if (!player.isClimbing) {
+        const closestFloor = findClosestFloor(player.y, floorY);
+        player.y = floorY[closestFloor];
+        player.currentFloor = closestFloor;
+    }
+    
     player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+}
+
+function findClosestFloor(playerY, floorY) {
+    let closestFloor = 0;
+    let minDistance = Math.abs(playerY - floorY[0]);
+    
+    for (let floor = 1; floor <= 2; floor++) {
+        const distance = Math.abs(playerY - floorY[floor]);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestFloor = floor;
+        }
+    }
+    
+    return closestFloor;
 }
 
 function drawGame() {
@@ -220,7 +284,7 @@ function drawGame() {
         drawLadder(ladder.x, ladder.y1, ladder.y2, ladder.width);
     }
     
-    drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame);
+    drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing);
 }
 
 function gameLoop() {
@@ -248,8 +312,10 @@ if (typeof module !== 'undefined' && module.exports) {
         drawFloorLines,
         drawLadder,
         drawStickman,
+        isOverLadder,
         isNearLadder,
         updatePlayer,
+        findClosestFloor,
         drawGame
     };
 }
