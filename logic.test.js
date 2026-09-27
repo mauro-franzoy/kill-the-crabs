@@ -18,6 +18,7 @@ function setupMockEnvironment() {
         currentPath: null,
         fillRectCalls: [],
         strokeCalls: [],
+        arcCalls: [],
         
         beginPath: function() {
             this.currentPath = [];
@@ -42,6 +43,10 @@ function setupMockEnvironment() {
         
         fillRect: function(x, y, width, height) {
             this.fillRectCalls.push({ x, y, width, height });
+        },
+        
+        arc: function(x, y, radius, startAngle, endAngle) {
+            this.arcCalls.push({ x, y, radius, startAngle, endAngle });
         },
         
         getContext: function() {
@@ -165,6 +170,75 @@ function testDrawLadder() {
     return true;
 }
 
+function testDrawStickman() {
+    setupMockEnvironment();
+    
+    const logic = require('./logic.js');
+    const x = 100;
+    const y = 200;
+    const height = 160;
+    const direction = 'right';
+    const animationFrame = 0;
+    
+    logic.drawStickman(x, y, height, direction, animationFrame);
+    
+    if (mockCtx.strokeStyle !== '#FF0000') {
+        console.error('Test failed: strokeStyle should be #FF0000, got', mockCtx.strokeStyle);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    if (mockCtx.lineWidth !== 4) {
+        console.error('Test failed: lineWidth should be 4, got', mockCtx.lineWidth);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    if (mockCtx.shadowColor !== '#FF0000') {
+        console.error('Test failed: shadowColor should be #FF0000, got', mockCtx.shadowColor);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    if (mockCtx.arcCalls.length !== 1) {
+        console.error('Test failed: should have 1 arc call for head, got', mockCtx.arcCalls.length);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    teardownMockEnvironment();
+    console.log('testDrawStickman passed');
+    return true;
+}
+
+function testIsNearLadder() {
+    setupMockEnvironment();
+    
+    const logic = require('./logic.js');
+    
+    const testLadders = [
+        { x: 100, y1: 200, y2: 400, width: 40 }
+    ];
+    
+    const resultNear = logic.isNearLadder(100, 300, testLadders);
+    if (resultNear !== true) {
+        console.error('Test failed: should detect ladder when near, got', resultNear);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    const resultFar = logic.isNearLadder(500, 300, testLadders);
+    if (resultFar !== false) {
+        console.error('Test failed: should not detect ladder when far, got', resultFar);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    teardownMockEnvironment();
+    console.log('testIsNearLadder passed');
+    return true;
+}
+
 function testResizeCanvas() {
     setupMockEnvironment();
     
@@ -266,16 +340,36 @@ function testSectionHeight() {
     return true;
 }
 
+function testPlayerHeight() {
+    setupMockEnvironment();
+    
+    const sectionHeight = mockCanvas.height / 3;
+    const playerHeight = (sectionHeight * 2) * 0.8;
+    
+    if (playerHeight !== 426.6666666666667) {
+        console.error('Test failed: player height should be 426.67, got', playerHeight);
+        teardownMockEnvironment();
+        return false;
+    }
+    
+    teardownMockEnvironment();
+    console.log('testPlayerHeight passed');
+    return true;
+}
+
 function runAllTests() {
     console.log('Running tests...');
     
     const results = [
         testDrawFloorLines(),
         testDrawLadder(),
+        testDrawStickman(),
+        testIsNearLadder(),
         testResizeCanvas(),
         testDrawGame(),
         testLadderPositioning(),
-        testSectionHeight()
+        testSectionHeight(),
+        testPlayerHeight()
     ];
     
     const allPassed = results.every(result => result === true);
@@ -293,10 +387,13 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = { 
         testDrawFloorLines, 
         testDrawLadder, 
+        testDrawStickman,
+        testIsNearLadder,
         testResizeCanvas, 
         testDrawGame,
         testLadderPositioning,
         testSectionHeight,
+        testPlayerHeight,
         runAllTests 
     };
 } else {
