@@ -46,7 +46,7 @@ const ladders = [];
 const enemies = [];
 const crabDeathEffects = [];
 let brickWallEncounter = null;
-const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false, won: false, paused: false };
+const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false, won: false, paused: false, manualPaused: false };
 const PLAYER_IMMUNITY_MS = 8000;
 const CRAB_DEATH_DURATION_MS = 1000;
 const CRAB_DEATH_FLICKER_START_MS = 600;
@@ -1482,7 +1482,7 @@ function drawFloorWords(sectionHeight) {
 }
 
 function drawGame(now = getGameTime()) {
-    ctx.filter = (gameState.gameOver || gameState.paused) ? 'blur(16px)' : 'none';
+    ctx.filter = (gameState.gameOver || (gameState.paused && !gameState.manualPaused)) ? 'blur(16px)' : 'none';
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -1538,7 +1538,7 @@ function drawGame(now = getGameTime()) {
     if (brickWallEncounter && captureElapsed >= 0 && captureElapsed < CRAB_NET_CAPTURE_DURATION_MS) {
         drawButterflyNet(brickWallEncounter, player.height * 0.62);
     }
-    if (gameState.paused) {
+    if (gameState.paused && !gameState.manualPaused) {
         ctx.filter = "none";
         ctx.fillStyle = "black";
         ctx.fillRect(canvas.width / 2 - 570, canvas.height / 2 - 135, 1140, 270);
@@ -1586,6 +1586,7 @@ function gameLoop(timestamp) {
         : wallNow - pausedDurationMs;
     if (!gameState.gameOver && !gameState.paused && wallNow - lastKeyboardInputTime >= IDLE_PAUSE_TIMEOUT_MS) {
         gameState.paused = true;
+        gameState.manualPaused = false;
         pausedAtWallTime = wallNow;
     }
     if (!gameState.gameOver && !gameState.paused) {
@@ -1616,6 +1617,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
                     pausedDurationMs += wallNow - pausedAtWallTime;
                     pausedAtWallTime = null;
                     gameState.paused = false;
+                    gameState.manualPaused = false;
                     lastKeyboardInputTime = wallNow;
                     for (const pressedKey of Object.keys(keys)) keys[pressedKey] = false;
                     spaceWasDown = false;
@@ -1624,6 +1626,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
                     if (typeof requestAnimationFrame !== "undefined") requestAnimationFrame(gameLoop);
                 } else {
                     gameState.paused = true;
+                    gameState.manualPaused = true;
                     pausedAtWallTime = wallNow;
                     for (const pressedKey of Object.keys(keys)) keys[pressedKey] = false;
                     spaceWasDown = false;
@@ -1641,6 +1644,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
                     pausedDurationMs += wallNow - pausedAtWallTime;
                     pausedAtWallTime = null;
                     gameState.paused = false;
+                    gameState.manualPaused = false;
                     lastKeyboardInputTime = wallNow;
                     for (const pressedKey of Object.keys(keys)) keys[pressedKey] = false;
                     spaceWasDown = false;
