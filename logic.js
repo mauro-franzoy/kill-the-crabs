@@ -1289,7 +1289,7 @@ function drawChefHat(x, y, height) {
     const headRadius = height * 0.15;
     const headY = y + headRadius;
     const hatWidth = headRadius * 2.5;
-    const hatHeight = headRadius * 1.7;
+    const hatHeight = headRadius * 3;
     const hatBottom = headY - headRadius * 0.72;
 
     ctx.fillStyle = '#f5f5f5';
@@ -1344,6 +1344,21 @@ function drawCookedCrab(x, y, size) {
     ctx.ellipse(x, y, size * 0.3, size * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    ctx.strokeStyle = '#050505';
+    ctx.lineWidth = Math.max(3, size * 0.035);
+    for (const side of [-1, 1]) {
+        const eyeX = x + side * size * 0.11;
+        const eyeY = y - size * 0.075;
+        const crossSize = size * 0.045;
+        ctx.beginPath();
+        ctx.moveTo(eyeX - crossSize, eyeY - crossSize);
+        ctx.lineTo(eyeX + crossSize, eyeY + crossSize);
+        ctx.moveTo(eyeX + crossSize, eyeY - crossSize);
+        ctx.lineTo(eyeX - crossSize, eyeY + crossSize);
+        ctx.stroke();
+    }
+    ctx.strokeStyle = '#9c1f1f';
+    ctx.lineWidth = Math.max(2, size * 0.035);
     for (const side of [-1, 1]) {
         for (let leg = 0; leg < 3; leg++) {
             const startY = y - size * 0.02 + leg * size * 0.055;
@@ -1395,8 +1410,12 @@ function drawTableScene(encounter, now) {
     ctx.fillRect(tableLeft + tableWidth * 0.85, tableY + sceneHeight * 0.44,
         sceneHeight * 0.07, encounter.floorY - tableY - sceneHeight * 0.44);
 
+    const leftSpace = playerX - (tableLeft + sceneHeight * 0.48);
+    const rightSpace = tableLeft + tableWidth - sceneHeight * 0.48 - playerX;
+    const plateSide = rightSpace >= leftSpace ? 1 : -1;
+    const desiredPlateX = playerX + plateSide * sceneHeight * 0.85;
     const plateX = Math.max(tableLeft + sceneHeight * 0.48,
-        Math.min(tableLeft + tableWidth - sceneHeight * 0.48, playerX + sceneHeight * 0.52));
+        Math.min(tableLeft + tableWidth - sceneHeight * 0.48, desiredPlateX));
     const plateY = tableY - sceneHeight * 0.025;
     ctx.fillStyle = '#f8f5ed';
     ctx.strokeStyle = '#a8a8a8';
@@ -1409,59 +1428,60 @@ function drawTableScene(encounter, now) {
     ctx.ellipse(plateX, plateY - sceneHeight * 0.025, sceneHeight * 0.3, sceneHeight * 0.08, 0, 0, Math.PI * 2);
     ctx.stroke();
     drawCookedCrab(plateX, plateY - sceneHeight * 0.2, sceneHeight * 0.8);
-    drawDiningUtensils(playerX, tableY, plateX, sceneHeight);
+    drawDiningUtensils(playerX, playerY, sceneHeight);
 }
 
-function drawDiningUtensils(playerX, tableY, plateX, size) {
-    const forkHandX = playerX + size * 0.12;
-    const knifeHandX = playerX + size * 0.18;
-    const handsY = tableY + size * 0.035;
-    const forkTipX = plateX - size * 0.2;
-    const knifeTipX = plateX + size * 0.2;
-    const utensilY = tableY - size * 0.12;
+function drawDiningUtensils(playerX, playerY, size) {
+    const headRadius = size * 0.15;
+    const headY = playerY + headRadius;
+    const shoulderY = playerY + size * 0.42;
+    const handY = headY + size * 0.035;
+    const handOffset = size * 0.24;
+    const forkHandX = playerX - handOffset;
+    const knifeHandX = playerX + handOffset;
+    const utensilTopY = headY - size * 0.34;
 
-    // Red stick-figure arms reach over the table to hold both utensils.
+    // The chef raises one red arm on each side of the head to hold the cutlery.
     ctx.strokeStyle = '#d32f2f';
     ctx.lineWidth = Math.max(4, size * 0.035);
     ctx.beginPath();
-    ctx.moveTo(playerX - size * 0.04, tableY - size * 0.15);
-    ctx.lineTo(forkHandX, handsY);
-    ctx.moveTo(playerX + size * 0.04, tableY - size * 0.15);
-    ctx.lineTo(knifeHandX, handsY + size * 0.035);
+    ctx.moveTo(playerX - size * 0.04, shoulderY);
+    ctx.lineTo(forkHandX, handY);
+    ctx.moveTo(playerX + size * 0.04, shoulderY);
+    ctx.lineTo(knifeHandX, handY);
     ctx.stroke();
     ctx.fillStyle = '#d32f2f';
     for (const handX of [forkHandX, knifeHandX]) {
         ctx.beginPath();
-        ctx.arc(handX, handsY, size * 0.035, 0, Math.PI * 2);
+        ctx.arc(handX, handY, size * 0.035, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Fork and knife angle from the chef's hands toward the plate.
-    ctx.strokeStyle = '#dedede';
-    ctx.lineWidth = Math.max(2, size * 0.018);
+    // White fork and knife, each about twice the previous length and thickness.
+    ctx.strokeStyle = '#ffffff';
+    ctx.fillStyle = '#ffffff';
+    ctx.lineWidth = Math.max(4, size * 0.03);
     ctx.beginPath();
-    ctx.moveTo(forkHandX, handsY);
-    ctx.lineTo(forkTipX, utensilY);
-    ctx.moveTo(forkTipX - size * 0.025, utensilY - size * 0.055);
-    ctx.lineTo(forkTipX, utensilY);
-    ctx.lineTo(forkTipX + size * 0.025, utensilY - size * 0.055);
-    ctx.moveTo(forkTipX, utensilY);
-    ctx.lineTo(forkTipX, utensilY - size * 0.065);
+    ctx.moveTo(forkHandX, handY);
+    ctx.lineTo(forkHandX, utensilTopY + size * 0.1);
+    ctx.moveTo(forkHandX - size * 0.055, utensilTopY + size * 0.1);
+    ctx.lineTo(forkHandX, utensilTopY + size * 0.04);
+    ctx.lineTo(forkHandX + size * 0.055, utensilTopY + size * 0.1);
+    ctx.moveTo(forkHandX, utensilTopY + size * 0.1);
+    ctx.lineTo(forkHandX, utensilTopY);
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(knifeHandX, handsY + size * 0.035);
-    ctx.lineTo(knifeTipX, utensilY + size * 0.015);
+    ctx.moveTo(knifeHandX, handY);
+    ctx.lineTo(knifeHandX, utensilTopY + size * 0.11);
     ctx.stroke();
-    ctx.fillStyle = '#eeeeee';
     ctx.beginPath();
-    ctx.moveTo(knifeTipX - size * 0.015, utensilY + size * 0.025);
-    ctx.lineTo(knifeTipX + size * 0.06, utensilY - size * 0.045);
-    ctx.lineTo(knifeTipX + size * 0.025, utensilY + size * 0.055);
+    ctx.moveTo(knifeHandX - size * 0.035, utensilTopY + size * 0.12);
+    ctx.lineTo(knifeHandX + size * 0.045, utensilTopY - size * 0.015);
+    ctx.lineTo(knifeHandX + size * 0.035, utensilTopY + size * 0.14);
     ctx.closePath();
     ctx.fill();
 }
-
 function drawFloorWords(sectionHeight) {
     const previousFilter = ctx.filter || "none";
     ctx.filter = previousFilter === "none" ? "blur(4px)" : previousFilter + " blur(4px)";
