@@ -41,10 +41,12 @@ function getAnimationTime() {
 
 const ladders = [];
 const enemies = [];
-const explosionEffects = [];
+const crabDeathEffects = [];
 const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false, won: false, paused: false };
 const PLAYER_IMMUNITY_MS = 8000;
-const EXPLOSION_DURATION_MS = 300;
+const CRAB_DEATH_DURATION_MS = 1000;
+const CRAB_DEATH_FLICKER_START_MS = 600;
+const CRAB_DEATH_GRAVITY = 650;
 const ENEMY_MIN_SPAWN_INTERVAL_MS = 2000;
 const ENEMY_MAX_SPAWN_INTERVAL_MS = 5000;
 const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
@@ -680,7 +682,7 @@ function updateEnemies(now = getGameTime()) {
         }
         enemy.isMoving = enemy.x !== previousX;
     }
-    updateExplosionEffects(now);
+    updateCrabDeathEffects(now);
     resolveEnemyCollisions(now);
 }
 
@@ -805,11 +807,28 @@ function playerBodyTouchesEnemy(enemyRectangle) {
         playerRectangle.bottom > enemyRectangle.top;
 }
 
-function updateExplosionEffects(now) {
-    for (let index = explosionEffects.length - 1; index >= 0; index--) {
-        if (now - explosionEffects[index].startTime >= EXPLOSION_DURATION_MS) {
-            explosionEffects.splice(index, 1);
+function getAttackTravelDirection() {
+    const direction = player.attack && player.attack.direction;
+    if (direction === "left") return { x: -1, y: 0 };
+    if (direction === "right") return { x: 1, y: 0 };
+    if (direction === "up") return { x: 0, y: -1 };
+    if (direction === "down") return { x: 0, y: 1 };
+    return { x: player.direction === "left" ? -1 : 1, y: 0 };
+}
+
+function updateCrabDeathEffects(now) {
+    for (let index = crabDeathEffects.length - 1; index >= 0; index--) {
+        const effect = crabDeathEffects[index];
+        if (now - effect.startTime >= CRAB_DEATH_DURATION_MS) {
+            crabDeathEffects.splice(index, 1);
+            continue;
         }
+        const deltaSeconds = Math.max(0, now - effect.lastUpdatedAt) / 1000;
+        effect.x += effect.velocityX * deltaSeconds;
+        effect.y += effect.velocityY * deltaSeconds + 0.5 * effect.gravity * deltaSeconds * deltaSeconds;
+        effect.velocityY += effect.gravity * deltaSeconds;
+        effect.rotation += effect.rotationSpeed * deltaSeconds;
+        effect.lastUpdatedAt = now;
     }
 }
 
@@ -822,10 +841,19 @@ function resolveEnemyCollisions(now) {
         const enemyRectangle = getEnemyRectangle(enemy);
         if (attackShape && attackTouchesEnemy(attackShape, enemyRectangle)) {
             enemies.splice(index, 1);
-            explosionEffects.push({
+            const hitDirection = getAttackTravelDirection();
+            crabDeathEffects.push({
                 x: enemy.x,
                 y: enemy.y + enemy.height / 2,
-                startTime: now
+                width: enemy.width,
+                height: enemy.height,
+                velocityX: hitDirection.x * 360,
+                velocityY: hitDirection.y * 360 - (hitDirection.y === 0 ? 180 : 0),
+                gravity: CRAB_DEATH_GRAVITY,
+                rotation: Math.PI,
+                rotationSpeed: hitDirection.x !== 0 ? hitDirection.x * 1.8 : -hitDirection.y * 1.8,
+                startTime: now,
+                lastUpdatedAt: now
             });
             gameState.score += 1;
             player.laughUntil = now + LAUGH_DURATION_MS;
@@ -915,27 +943,32 @@ function drawCrab(enemy, now = getGameTime()) {
     }
 }
 
-function drawCrabExplosion(explosion, now) {
-    const progress = Math.max(0, Math.min(1, (now - explosion.startTime) / EXPLOSION_DURATION_MS));
+function drawCrabDeathAnimation(effect, now) {
+    const elapsed = now - effect.startTime;
     const previousAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = 1 - progress;
-    const radius = 8 + progress * 28;
-    ctx.strokeStyle = "orange";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-    for (let ray = 0; ray < 8; ray++) {
-        const angle = ray * Math.PI / 4;
-        ctx.beginPath();
-        ctx.moveTo(explosion.x + Math.cos(angle) * radius * 0.45, explosion.y + Math.sin(angle) * radius * 0.45);
-        ctx.lineTo(explosion.x + Math.cos(angle) * radius * 1.5, explosion.y + Math.sin(angle) * radius * 1.5);
-        ctx.stroke();
+    if (elapsed >= CRAB_DEATH_FLICKER_START_MS &&
+        Math.floor((elapsed - CRAB_DEATH_FLICKER_START_MS) / 80) % 2 === 0) {
+        ctx.globalAlpha = previousAlpha * 0.3;
     }
-    ctx.fillStyle = "yellow";
-    ctx.beginPath();
-    ctx.arc(explosion.x, explosion.y, radius * 0.35, 0, Math.PI * 2);
-    ctx.fill();
+
+    const deadCrab = {
+        x: 0,
+        y: -effect.height * 0.52,
+        width: effect.width,
+        height: effect.height,
+        isMoving: false
+    };
+    if (ctx.save && ctx.translate && ctx.rotate && ctx.restore) {
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate(effect.rotation);
+        drawCrab(deadCrab, now);
+        ctx.restore();
+    } else {
+        deadCrab.x = effect.x;
+        deadCrab.y += effect.y;
+        drawCrab(deadCrab, now);
+    }
     ctx.globalAlpha = previousAlpha;
 }
 function drawFloorWords(sectionHeight) {
@@ -974,8 +1007,8 @@ function drawGame(now = getGameTime()) {
     for (const enemy of enemies) {
         drawCrab(enemy, now);
     }
-    for (const explosion of explosionEffects) {
-        drawCrabExplosion(explosion, now);
+    for (const deathEffect of crabDeathEffects) {
+        drawCrabDeathAnimation(deathEffect, now);
     }
     
     const immunityAge = PLAYER_IMMUNITY_MS - (gameState.immuneUntil - now);
@@ -1016,9 +1049,11 @@ function gameLoop(timestamp) {
     if (!gameState.gameOver && !gameState.paused) {
         updatePlayer(now);
         updateEnemies(now);
+    } else if (!gameState.paused && crabDeathEffects.length > 0) {
+        updateCrabDeathEffects(now);
     }
     drawGame(now);
-    if (!gameState.paused && ((!gameState.gameOver || player.laughUntil > now)) && typeof requestAnimationFrame !== "undefined") {
+    if (!gameState.paused && ((!gameState.gameOver || player.laughUntil > now || crabDeathEffects.length > 0)) && typeof requestAnimationFrame !== "undefined") {
         requestAnimationFrame(gameLoop);
     }
 }
@@ -1063,7 +1098,8 @@ if (typeof module !== 'undefined' && module.exports) {
         keys,
         ladders,
         enemies,
-        explosionEffects,
+        crabDeathEffects,
+        explosionEffects: crabDeathEffects,
         gameState,
         resizeCanvas,
         drawFloorLines,
