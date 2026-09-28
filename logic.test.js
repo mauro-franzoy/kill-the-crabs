@@ -31,6 +31,7 @@ function setupMockEnvironment() {
         fillTextCalls: [],
         fillCalls: [],
         strokeCalls: [],
+        strokeStyles: [],
         arcCalls: [],
         ellipseCalls: [],
         
@@ -52,6 +53,7 @@ function setupMockEnvironment() {
         
         stroke: function() {
             this.strokeCalls.push([...this.currentPath]);
+            this.strokeStyles.push(this.strokeStyle);
             this.lastPath = this.currentPath;
         },
 
@@ -830,26 +832,43 @@ function testPlayerDamageImmunityAndGameOver() {
     Math.random = function() { return 0.5; };
     try {
         logic.updateEnemies(1000);
-        if (logic.gameState.lives !== 2 || logic.gameState.immuneUntil !== 5000 || mockLivesElement.textContent !== "2") {
-            console.error("Test failed: touching the player should remove one life and grant four seconds of immunity");
+        if (logic.gameState.lives !== 2 || logic.gameState.immuneUntil !== 9000 || mockLivesElement.textContent !== "2") {
+            console.error("Test failed: touching the player should remove one life and grant eight seconds of immunity");
             return false;
         }
-        logic.updateEnemies(4999);
-        if (logic.gameState.lives !== 2) {
-            console.error("Test failed: the player should remain immune until four seconds have elapsed");
+        logic.drawGame(1000);
+        if (!mockCtx.strokeStyles.includes("red")) {
+            console.error("Test failed: the player should blink red at the start of immunity");
             return false;
         }
-        logic.updateEnemies(5000);
-        if (logic.gameState.lives !== 1 || logic.gameState.immuneUntil !== 9000) {
-            console.error("Test failed: a crab should hurt the player again after immunity ends");
+        let strokesBeforeBlink = mockCtx.strokeCalls.length;
+        logic.drawGame(1250);
+        if (mockCtx.strokeStyles.slice(strokesBeforeBlink).some(color => color === "red" || color === "magenta")) {
+            console.error("Test failed: the player should disappear during the blink interval");
+            return false;
+        }
+        strokesBeforeBlink = mockCtx.strokeCalls.length;
+        logic.drawGame(1500);
+        if (!mockCtx.strokeStyles.slice(strokesBeforeBlink).includes("magenta")) {
+            console.error("Test failed: the player should blink magenta during immunity");
             return false;
         }
         logic.updateEnemies(8999);
+        if (logic.gameState.lives !== 2) {
+            console.error("Test failed: the player should remain immune until eight seconds have elapsed");
+            return false;
+        }
+        logic.updateEnemies(9000);
+        if (logic.gameState.lives !== 1 || logic.gameState.immuneUntil !== 17000) {
+            console.error("Test failed: a crab should hurt the player again after immunity ends");
+            return false;
+        }
+        logic.updateEnemies(16999);
         if (logic.gameState.lives !== 1) {
             console.error("Test failed: the second immunity period should prevent repeated damage");
             return false;
         }
-        logic.updateEnemies(9000);
+        logic.updateEnemies(17000);
         if (logic.gameState.lives !== 0 || !logic.gameState.gameOver || mockLivesElement.textContent !== "0") {
             console.error("Test failed: losing the last life should end the game");
             return false;
@@ -864,10 +883,17 @@ function testPlayerDamageImmunityAndGameOver() {
             console.error("Test failed: player and crabs should freeze after game over");
             return false;
         }
-        logic.drawGame(9000);
+        logic.drawGame(17000);
+        const gameOverBox = mockCtx.fillRectCalls.slice(-1)[0];
+        if (!gameOverBox || gameOverBox.fillStyle !== "black" ||
+            gameOverBox.x !== mockCanvas.width / 2 - 570 || gameOverBox.y !== mockCanvas.height / 2 - 135 ||
+            gameOverBox.width !== 1140 || gameOverBox.height !== 270) {
+            console.error("Test failed: game over should have a centered black backing box");
+            return false;
+        }
         const finalMessage = mockCtx.fillTextCalls.slice(-1)[0];
         if (!finalMessage || finalMessage.text !== "GAME OVER" ||
-            finalMessage.fillStyle !== "darkgreen" ||
+            finalMessage.fillStyle !== "darkgreen" || finalMessage.font !== "bold 192px Arial" ||
             finalMessage.x !== mockCanvas.width / 2 || finalMessage.y !== mockCanvas.height / 2) {
             console.error("Test failed: game over should display large centered dark green text");
             return false;

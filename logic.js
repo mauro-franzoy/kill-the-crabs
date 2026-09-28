@@ -39,7 +39,7 @@ const ladders = [];
 const enemies = [];
 const explosionEffects = [];
 const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false };
-const PLAYER_IMMUNITY_MS = 4000;
+const PLAYER_IMMUNITY_MS = 8000;
 const EXPLOSION_DURATION_MS = 300;
 const ENEMY_SPAWN_INTERVAL_MS = 5000;
 const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
@@ -144,15 +144,15 @@ function drawLadder(x, y1, y2, width) {
     ctx.shadowBlur = 0;
 }
 
-function drawStickman(x, y, height, direction, animationFrame, isClimbing, attack = player.attack, now = getAnimationTime()) {
+function drawStickman(x, y, height, direction, animationFrame, isClimbing, attack = player.attack, now = getAnimationTime(), playerColor = 'red') {
     const headRadius = height * 0.15;
     const bodyLength = height * 0.4;
     const legLength = height * 0.25;
     const armLength = height * 0.2;
     
-    ctx.strokeStyle = 'red';
+    ctx.strokeStyle = playerColor;
     ctx.lineWidth = 4;
-    ctx.shadowColor = 'red';
+    ctx.shadowColor = playerColor;
     ctx.shadowBlur = 5;
     
     const centerX = x;
@@ -234,16 +234,16 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
     );
     if (peakVisible) {
         if (isKicking) {
-            drawFootAtTip(attackTip.x, attackTip.y, attackTip.originX, attackTip.originY, headRadius);
+            drawFootAtTip(attackTip.x, attackTip.y, attackTip.originX, attackTip.originY, headRadius, playerColor);
         } else if (isPunching) {
-            drawFistAtTip(attackTip.x, attackTip.y, attackTip.originX, attackTip.originY, headRadius);
+            drawFistAtTip(attackTip.x, attackTip.y, attackTip.originX, attackTip.originY, headRadius, playerColor);
         }
     }
     
     ctx.shadowBlur = 0;
 }
 
-function drawFootAtTip(tipX, tipY, originX, originY, headRadius) {
+function drawFootAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') {
     const directionX = tipX - originX;
     const directionY = tipY - originY;
     const directionLength = Math.hypot(directionX, directionY);
@@ -271,19 +271,19 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius) {
     ctx.lineTo(ballX - perpendicularX * halfWidth, ballY - perpendicularY * halfWidth);
     ctx.lineTo(heelX - perpendicularX * halfWidth * 0.35, heelY - perpendicularY * halfWidth * 0.35);
     ctx.closePath();
-    ctx.fillStyle = 'red';
+    ctx.fillStyle = color;
     ctx.fill();
-    ctx.strokeStyle = 'darkred';
+    ctx.strokeStyle = color;
     ctx.stroke();
 
     ctx.beginPath();
     ctx.moveTo(ballX - perpendicularX * halfWidth * 0.85, ballY - perpendicularY * halfWidth * 0.85);
     ctx.lineTo(toeX - perpendicularX * halfWidth * 0.3, toeY - perpendicularY * halfWidth * 0.3);
     ctx.stroke();
-    ctx.strokeStyle = 'red';
+    ctx.strokeStyle = color;
 }
 
-function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
+function drawFistAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') {
     const directionX = tipX - originX;
     const directionY = tipY - originY;
     const directionLength = Math.hypot(directionX, directionY);
@@ -312,9 +312,9 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
     ctx.lineTo(tipX - perpendicularX * fistHalfWidth, tipY - perpendicularY * fistHalfWidth);
     ctx.lineTo(wristX - perpendicularX * fistHalfWidth * 0.55, wristY - perpendicularY * fistHalfWidth * 0.55);
     ctx.closePath();
-    ctx.fillStyle = 'red';
+    ctx.fillStyle = color;
     ctx.fill();
-    ctx.strokeStyle = 'darkred';
+    ctx.strokeStyle = color;
     ctx.stroke();
 
     for (let knuckle = -1; knuckle <= 1; knuckle++) {
@@ -326,7 +326,7 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius) {
             tipY + unitY * fistLength * 0.2 + perpendicularY * offset);
         ctx.stroke();
     }
-    ctx.strokeStyle = 'red';
+    ctx.strokeStyle = color;
 }
 
 function isOverLadder(playerX, playerY, ladderArray) {
@@ -853,10 +853,17 @@ function drawGame(now = getAnimationTime()) {
         drawCrabExplosion(explosion, now);
     }
     
-    drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now);
+    const immunityAge = PLAYER_IMMUNITY_MS - (gameState.immuneUntil - now);
+    const blinkPhase = Math.floor(immunityAge / 250) % 4;
+    if (now >= gameState.immuneUntil || blinkPhase % 2 === 0) {
+        const playerColor = now < gameState.immuneUntil && blinkPhase === 2 ? 'magenta' : 'red';
+        drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now, playerColor);
+    }
     if (gameState.gameOver) {
+        ctx.fillStyle = "black";
+        ctx.fillRect(canvas.width / 2 - 570, canvas.height / 2 - 135, 1140, 270);
         ctx.fillStyle = "darkgreen";
-        ctx.font = "bold 96px Arial";
+        ctx.font = "bold 192px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
