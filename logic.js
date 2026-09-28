@@ -30,6 +30,8 @@ const ATTACK_DURATION = 12;
 const ATTACK_PEAK_FRAME = 6;
 const EXTREMITY_HOLD_MS = 500;
 const LAUGH_DURATION_MS = 1200;
+const IDLE_PAUSE_TIMEOUT_MS = 10000;
+const MAX_VISIBLE_ENEMIES = 10;
 
 function getAnimationTime() {
     return (typeof performance !== 'undefined' && typeof performance.now === 'function')
@@ -40,13 +42,20 @@ function getAnimationTime() {
 const ladders = [];
 const enemies = [];
 const explosionEffects = [];
-const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false, won: false };
+const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false, won: false, paused: false };
 const PLAYER_IMMUNITY_MS = 8000;
 const EXPLOSION_DURATION_MS = 300;
 const ENEMY_MIN_SPAWN_INTERVAL_MS = 2000;
 const ENEMY_MAX_SPAWN_INTERVAL_MS = 5000;
 const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
 let nextEnemySpawnTime = null;
+let pausedDurationMs = 0;
+let pausedAtWallTime = null;
+let lastKeyboardInputTime = getAnimationTime();
+
+function getGameTime() {
+    return getAnimationTime() - pausedDurationMs;
+}
 
 function getRandomEnemySpawnInterval() {
     return ENEMY_MIN_SPAWN_INTERVAL_MS + Math.floor(Math.random() * (ENEMY_MAX_SPAWN_INTERVAL_MS - ENEMY_MIN_SPAWN_INTERVAL_MS + 1));
@@ -151,7 +160,7 @@ function drawLadder(x, y1, y2, width) {
     ctx.shadowBlur = 0;
 }
 
-function drawStickman(x, y, height, direction, animationFrame, isClimbing, attack = player.attack, now = getAnimationTime(), playerColor = 'red') {
+function drawStickman(x, y, height, direction, animationFrame, isClimbing, attack = player.attack, now = getGameTime(), playerColor = 'red') {
     const headRadius = height * 0.15;
     const bodyLength = height * 0.4;
     const legLength = height * 0.25;
@@ -172,7 +181,7 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         const facingSign = direction === "left" ? -1 : 1;
         const laughElapsed = now - (player.laughUntil - LAUGH_DURATION_MS);
         const laughPulse = (Math.sin(laughElapsed / 65) + 1) / 2;
-        const headTilt = facingSign * (1.18 + laughPulse * 0.12);
+        const headTilt = facingSign * (1.38 + laughPulse * 0.12);
         const headCenterX = centerX - facingSign * headRadius * 0.35;
         const previousFont = ctx.font;
         const previousTextAlign = ctx.textAlign;
@@ -204,18 +213,18 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.stroke();
         ctx.strokeStyle = playerColor;
         const eyeY = headY - headRadius * 0.43;
-        const eyeHalfWidth = headRadius * 0.38;
-        const eyeHalfHeight = headRadius * 0.15;
+        const eyeHalfWidth = headRadius * 0.4;
+        const eyeHalfHeight = headRadius * 0.14;
         ctx.beginPath();
         ctx.moveTo(headCenterX - eyeHalfWidth, eyeY - eyeHalfHeight);
         ctx.lineTo(headCenterX + eyeHalfWidth, eyeY + eyeHalfHeight);
         ctx.moveTo(headCenterX - eyeHalfWidth, eyeY + eyeHalfHeight);
         ctx.lineTo(headCenterX + eyeHalfWidth, eyeY - eyeHalfHeight);
         ctx.stroke();
-        const tearX = headCenterX + facingSign * eyeHalfWidth * 0.72;
-        const tearY = eyeY + eyeHalfHeight * 0.55;
-        const tearHalfWidth = headRadius * 0.075;
-        const tearHeight = headRadius * 0.13;
+        const tearHalfWidth = headRadius * 0.12;
+        const tearHeight = headRadius * 0.22;
+        const tearX = headCenterX + facingSign * (eyeHalfWidth + tearHalfWidth + headRadius * 0.12);
+        const tearY = eyeY + headRadius * 0.2;
         ctx.beginPath();
         ctx.moveTo(tearX, tearY - tearHeight);
         ctx.quadraticCurveTo(tearX + tearHalfWidth, tearY - tearHeight * 0.2, tearX + tearHalfWidth, tearY + tearHeight * 0.35);
@@ -223,9 +232,7 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.quadraticCurveTo(tearX - tearHalfWidth, tearY + tearHeight, tearX - tearHalfWidth, tearY + tearHeight * 0.35);
         ctx.quadraticCurveTo(tearX - tearHalfWidth, tearY - tearHeight * 0.2, tearX, tearY - tearHeight);
         ctx.closePath();
-        ctx.fillStyle = "deepskyblue";
-        ctx.strokeStyle = "deepskyblue";
-        ctx.fill();
+        ctx.strokeStyle = playerColor;
         ctx.stroke();
         ctx.strokeStyle = playerColor;
         ctx.fillStyle = playerColor;
@@ -460,7 +467,7 @@ function isNearLadder(playerX, playerY, ladderArray) {
     return false;
 }
 
-function updatePlayer(now = getAnimationTime()) {
+function updatePlayer(now = getGameTime()) {
     if (gameState.gameOver) return;
     player.isMoving = false;
     player.isClimbing = false;
@@ -576,15 +583,17 @@ function findClosestFloor(playerY, floorY) {
     return closestFloor;
 }
 
-function updateEnemies(now = getAnimationTime()) {
+function updateEnemies(now = getGameTime()) {
     if (gameState.gameOver) return;
-    if (nextEnemySpawnTime === null) {
+    if (enemies.length >= MAX_VISIBLE_ENEMIES) {
+        nextEnemySpawnTime = null;
+    } else if (nextEnemySpawnTime === null) {
         nextEnemySpawnTime = now + getRandomEnemySpawnInterval();
     } else if (now >= nextEnemySpawnTime) {
         nextEnemySpawnTime = now + getRandomEnemySpawnInterval();
         const enemyHeight = player.height / 2;
         const enemyWidth = enemyHeight * 1.5;
-        const spawnCount = 1 + Math.floor(Math.random() * 3);
+        const spawnCount = Math.min(1 + Math.floor(Math.random() * 3), MAX_VISIBLE_ENEMIES - enemies.length);
         if (enemyHeight > 0 && enemyWidth <= canvas.width) {
             const minX = enemyWidth / 2;
             const maxX = canvas.width - enemyWidth / 2;
@@ -824,7 +833,7 @@ function resolveEnemyCollisions(now) {
         break;
     }
 }
-function drawCrab(enemy, now = getAnimationTime()) {
+function drawCrab(enemy, now = getGameTime()) {
     const centerX = enemy.x;
     const centerY = enemy.y + enemy.height * 0.52;
     const halfWidth = enemy.width / 2;
@@ -933,7 +942,7 @@ function drawFloorWords(sectionHeight) {
     ctx.filter = previousFilter;
 }
 
-function drawGame(now = getAnimationTime()) {
+function drawGame(now = getGameTime()) {
     ctx.filter = gameState.gameOver ? 'blur(16px)' : 'none';
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -960,7 +969,16 @@ function drawGame(now = getAnimationTime()) {
         const playerColor = now < gameState.immuneUntil && blinkPhase === 2 ? 'magenta' : 'red';
         drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now, playerColor);
     }
-    if (gameState.gameOver) {
+    if (gameState.paused) {
+        ctx.filter = "none";
+        ctx.fillStyle = "black";
+        ctx.fillRect(canvas.width / 2 - 570, canvas.height / 2 - 135, 1140, 270);
+        ctx.fillStyle = "darkgreen";
+        ctx.font = "900 88px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("SPACEBAR TO RESUME", canvas.width / 2, canvas.height / 2);
+    } else if (gameState.gameOver) {
         ctx.filter = "none";
         ctx.fillStyle = "black";
         ctx.fillRect(canvas.width / 2 - 570, canvas.height / 2 - 135, 1140, 270);
@@ -974,13 +992,18 @@ function drawGame(now = getAnimationTime()) {
 }
 
 function gameLoop(timestamp) {
-    const now = typeof timestamp === "number" ? timestamp : getAnimationTime();
-    if (!gameState.gameOver) {
+    const wallNow = typeof timestamp === "number" ? timestamp : getAnimationTime();
+    const now = wallNow - pausedDurationMs;
+    if (!gameState.gameOver && !gameState.paused && wallNow - lastKeyboardInputTime >= IDLE_PAUSE_TIMEOUT_MS) {
+        gameState.paused = true;
+        pausedAtWallTime = wallNow;
+    }
+    if (!gameState.gameOver && !gameState.paused) {
         updatePlayer(now);
         updateEnemies(now);
     }
     drawGame(now);
-    if ((!gameState.gameOver || player.laughUntil > now) && typeof requestAnimationFrame !== "undefined") {
+    if (!gameState.paused && ((!gameState.gameOver || player.laughUntil > now)) && typeof requestAnimationFrame !== "undefined") {
         requestAnimationFrame(gameLoop);
     }
 }
@@ -988,7 +1011,22 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('keydown', (e) => {
         const key = e.code === 'Space' || e.key === ' ' ? 'Space' : e.key;
         if (keys.hasOwnProperty(key)) {
+            if (gameState.paused) {
+                if (key === "Space" && !gameState.gameOver) {
+                    const wallNow = getAnimationTime();
+                    pausedDurationMs += wallNow - pausedAtWallTime;
+                    pausedAtWallTime = null;
+                    gameState.paused = false;
+                    lastKeyboardInputTime = wallNow;
+                    for (const pressedKey of Object.keys(keys)) keys[pressedKey] = false;
+                    spaceWasDown = false;
+                    if (typeof requestAnimationFrame !== "undefined") requestAnimationFrame(gameLoop);
+                }
+                if (e.preventDefault) e.preventDefault();
+                return;
+            }
             keys[key] = true;
+            lastKeyboardInputTime = getAnimationTime();
             if (e.preventDefault) {
                 e.preventDefault();
             }
@@ -999,6 +1037,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
         const key = e.code === 'Space' || e.key === ' ' ? 'Space' : e.key;
         if (keys.hasOwnProperty(key)) {
             keys[key] = false;
+            lastKeyboardInputTime = getAnimationTime();
         }
     });
 }
