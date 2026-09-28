@@ -250,42 +250,50 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
 
 function drawFootAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') {
     const directionX = tipX - originX;
-    const directionY = tipY - originY;
-    const directionLength = Math.hypot(directionX, directionY);
-    if (directionLength === 0) return;
+    if (directionX === 0 && tipY === originY) return;
 
-    const unitX = directionX / directionLength;
-    const unitY = directionY / directionLength;
-    const perpendicularX = -unitY;
-    const perpendicularY = unitX;
     const footLength = headRadius * 4;
-    const halfWidth = headRadius * 0.55;
-    const heelX = tipX - unitX * footLength * 0.25;
-    const heelY = tipY - unitY * footLength * 0.25;
-    const toeX = tipX + unitX * footLength * 0.75;
-    const toeY = tipY + unitY * footLength * 0.75;
-    const ballX = tipX + unitX * footLength * 0.52;
-    const ballY = tipY + unitY * footLength * 0.52;
+    const halfWidth = headRadius * 0.85;
+    const bodySide = directionX >= 0 ? -1 : 1;
+    const heelY = tipY + footLength * 0.16;
+    const archY = tipY - footLength * 0.34;
+    const toeBaseY = tipY - footLength * 0.62;
 
     ctx.beginPath();
-    ctx.moveTo(heelX + perpendicularX * halfWidth * 0.35, heelY + perpendicularY * halfWidth * 0.35);
-    ctx.lineTo(ballX + perpendicularX * halfWidth, ballY + perpendicularY * halfWidth);
-    ctx.lineTo(toeX + perpendicularX * halfWidth * 0.35, toeY + perpendicularY * halfWidth * 0.35);
-    ctx.lineTo(toeX, toeY);
-    ctx.lineTo(toeX - perpendicularX * halfWidth * 0.35, toeY - perpendicularY * halfWidth * 0.35);
-    ctx.lineTo(ballX - perpendicularX * halfWidth, ballY - perpendicularY * halfWidth);
-    ctx.lineTo(heelX - perpendicularX * halfWidth * 0.35, heelY - perpendicularY * halfWidth * 0.35);
+    ctx.moveTo(tipX - halfWidth * 0.28, heelY);
+    ctx.quadraticCurveTo(tipX - halfWidth * 0.6, tipY + footLength * 0.14,
+        tipX - halfWidth * 0.65, tipY + footLength * 0.04);
+    ctx.lineTo(tipX - halfWidth * 0.54, archY);
+    ctx.quadraticCurveTo(tipX - halfWidth * 1.1, toeBaseY, tipX - halfWidth, toeBaseY);
+    ctx.lineTo(tipX + halfWidth, toeBaseY);
+    ctx.quadraticCurveTo(tipX + halfWidth * 0.9, archY,
+        tipX + halfWidth * 0.38, tipY - footLength * 0.3);
+    ctx.lineTo(tipX + halfWidth * 0.28, tipY + footLength * 0.04);
+    ctx.quadraticCurveTo(tipX + halfWidth * 0.5, tipY + footLength * 0.14,
+        tipX + halfWidth * 0.28, heelY);
     ctx.closePath();
     ctx.fillStyle = color;
     ctx.fill();
     ctx.strokeStyle = color;
     ctx.stroke();
 
-    ctx.beginPath();
-    ctx.moveTo(ballX - perpendicularX * halfWidth * 0.85, ballY - perpendicularY * halfWidth * 0.85);
-    ctx.lineTo(toeX - perpendicularX * halfWidth * 0.3, toeY - perpendicularY * halfWidth * 0.3);
-    ctx.stroke();
-    ctx.strokeStyle = color;
+    const toeLengths = [0.22, 0.18, 0.16, 0.14, 0.12];
+    const toeOffsets = [0.68, 0.34, 0, -0.34, -0.68];
+    for (let toe = 0; toe < toeLengths.length; toe++) {
+        const isBigToe = toe === 0;
+        const toeX = tipX + bodySide * halfWidth * (toeOffsets[toe] + (isBigToe ? 0.06 : 0));
+        const toeRadiusX = halfWidth * (isBigToe ? 0.44 : 0.14);
+        const toeRadiusY = footLength * toeLengths[toe] * (isBigToe ? 1 : 0.5);
+        const toeY = toeBaseY - toeRadiusY;
+        const toeBend = isBigToe ? bodySide * 0.24 : 0;
+
+        ctx.beginPath();
+        ctx.ellipse(toeX, toeY, toeRadiusX, toeRadiusY, toeBend, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.stroke();
+    }
 }
 
 function drawFistAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') {

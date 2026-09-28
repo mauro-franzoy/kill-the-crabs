@@ -52,6 +52,12 @@ function setupMockEnvironment() {
                 this.currentPath.push({ type: 'line', x, y });
             }
         },
+
+        quadraticCurveTo: function(controlX, controlY, x, y) {
+            if (this.currentPath) {
+                this.currentPath.push({ type: 'quadratic', controlX, controlY, x, y });
+            }
+        },
         
         stroke: function() {
             this.strokeCalls.push([...this.currentPath]);
@@ -615,6 +621,7 @@ function testSpacebarAttackAnimations() {
 
     const floorStrokeStart = mockCtx.strokeCalls.length;
     const footFillStart = mockCtx.fillCalls.length;
+    const toeEllipseStart = mockCtx.ellipseCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, false, { type: 'kick', direction: 'left', frame: 6 });
     const kickFoot = mockCtx.strokeCalls.slice(floorStrokeStart)[2];
     const horizontalKickLength = kickFoot
@@ -623,14 +630,22 @@ function testSpacebarAttackAnimations() {
     const horizontalUnitX = kickFoot ? (kickFoot[1].x - kickFoot[0].x) / horizontalKickLength : 0;
     const horizontalUnitY = kickFoot ? (kickFoot[1].y - kickFoot[0].y) / horizontalKickLength : 0;
     const shoePath = mockCtx.strokeCalls.slice(floorStrokeStart)[6];
-    const shoeLength = shoePath
-        ? (shoePath[2].x - shoePath[0].x) * horizontalUnitX + (shoePath[2].y - shoePath[0].y) * horizontalUnitY
+    const toeEllipses = mockCtx.ellipseCalls.slice(toeEllipseStart);
+    const shoeLength = shoePath && toeEllipses.length
+        ? Math.max(...shoePath.filter(point => typeof point.y === 'number').map(point => point.y)) -
+            Math.min(...toeEllipses.map(toe => toe.y - toe.radiusY))
         : 0;
     const shoeFill = mockCtx.fillCalls[footFillStart];
+    const bigToe = toeEllipses[0];
+    const otherToe = toeEllipses[1];
     if (!kickFoot || kickFoot[1].x >= kickFoot[0].x || Math.abs(horizontalKickLength - 160 * 0.25 * 5) > 0.001 ||
-        !shoeFill || shoeFill.fillStyle !== 'red' || mockCtx.fillCalls.length - footFillStart !== 1 ||
-        Math.abs(shoeLength - 160 * 0.15 * 4) > 0.001) {
-        console.error('Test failed: peak left kick should show a foot twice the head diameter at its tip');
+        !shoeFill || shoeFill.fillStyle !== 'red' || mockCtx.fillCalls.length - footFillStart !== 6 ||
+        toeEllipses.length !== 5 || toeEllipses.some(toe => toe.radiusY <= toe.radiusX || toe.y >= kickFoot[1].y) ||
+        Math.abs(bigToe.radiusX - 160 * 0.15 * 0.85 * 0.44) > 0.001 ||
+        Math.abs(bigToe.radiusY - 160 * 0.15 * 4 * 0.22) > 0.001 ||
+        bigToe.x <= kickFoot[1].x || bigToe.rotation <= 0 ||
+        Math.abs(shoeLength - 160 * 0.15 * 4 * 1.22) > 0.001) {
+        console.error('Test failed: peak kick should show a side-view foot with five upward toes and a thicker inward-curved big toe');
         teardownMockEnvironment();
         return false;
     }
@@ -727,8 +742,8 @@ function testSpacebarAttackAnimations() {
     const timedKickFillStart = mockCtx.fillCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, false, timedKick, 1499);
     logic.drawStickman(100, 200, 160, 'left', 0, false, timedKick, 1501);
-    if (mockCtx.fillCalls.length - timedKickFillStart !== 1) {
-        console.error('Test failed: filled foot should stay visible for half a second');
+    if (mockCtx.fillCalls.length - timedKickFillStart !== 6) {
+        console.error('Test failed: filled foot and toes should stay visible for half a second');
         teardownMockEnvironment();
         return false;
     }
