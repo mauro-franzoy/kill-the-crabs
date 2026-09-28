@@ -27,6 +27,8 @@ const keys = {
 };
 
 let spaceWasDown = false;
+let spacePressedPending = false;
+let spacePressedWithShift = false;
 const ATTACK_DURATION = 12;
 const ATTACK_PEAK_FRAME = 6;
 const EXTREMITY_HOLD_MS = 800;
@@ -53,6 +55,7 @@ const ENEMY_MIN_SPAWN_INTERVAL_MS = 2000;
 const ENEMY_MAX_SPAWN_INTERVAL_MS = 5000;
 const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
 const BRICK_WALL_BUILD_DURATION_MS = 900;
+const CRAB_NET_CAPTURE_DURATION_MS = 500;
 const BRICK_WALL_THICKNESS = 18;
 let nextEnemySpawnTime = null;
 let pausedDurationMs = 0;
@@ -282,8 +285,8 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
     }
     
     const shoulderY = bodyTopY + bodyLength * 0.3;
-    const isKicking = attack && attack.type === 'kick';
-    const isPunching = attack && attack.type === 'punch';
+    const isKicking = attack && attack.type === 'kick' && !attack.brickWall;
+    const isPunching = attack && attack.type === 'punch' && !attack.brickWall;
     const activeSide = isKicking
         ? ((attack.direction === 'left' || (attack.direction === 'down' && direction === 'left')) ? -1 : 1)
         : (direction === 'left' ? -1 : 1);
@@ -577,14 +580,15 @@ function updatePlayer(now = getGameTime()) {
     
     player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 
-    if (keys.Space && !spaceWasDown) {
+    if ((keys.Space && !spaceWasDown) || spacePressedPending) {
+        const brickWallAttack = keys.Shift || spacePressedWithShift;
         const attackDirection = keys.ArrowUp
             ? "up"
             : (keys.ArrowDown ? "down" : (keys.ArrowLeft ? "left" : (keys.ArrowRight ? "right" : null)));
         if (attackDirection) {
             player.attack = attackDirection === "up"
-                ? { type: "punch", direction: attackDirection, frame: 0, peakTime: null, brickWall: keys.Shift }
-                : { type: "kick", direction: attackDirection, frame: 0, peakTime: null, brickWall: keys.Shift };
+                ? { type: "punch", direction: attackDirection, frame: 0, peakTime: null, brickWall: brickWallAttack }
+                : { type: "kick", direction: attackDirection, frame: 0, peakTime: null, brickWall: brickWallAttack };
         } else {
             const attackLadder = isOverLadder(player.x, player.y);
             const insideLadder = attackLadder && (
@@ -594,9 +598,11 @@ function updatePlayer(now = getGameTime()) {
             );
             const fallbackDirection = insideLadder ? (player.lastClimbDirection || "up") : player.direction;
             player.attack = fallbackDirection === "up"
-                ? { type: "punch", direction: "up", frame: 0, peakTime: null }
-                : { type: "kick", direction: fallbackDirection, frame: 0, peakTime: null };
+                ? { type: "punch", direction: "up", frame: 0, peakTime: null, brickWall: brickWallAttack }
+                : { type: "kick", direction: fallbackDirection, frame: 0, peakTime: null, brickWall: brickWallAttack };
         }
+        spacePressedPending = false;
+        spacePressedWithShift = false;
     }
     spaceWasDown = keys.Space;
 
@@ -998,6 +1004,7 @@ function beginBrickWallEncounter(enemy, now) {
         left,
         right,
         startTime: now,
+        captureTime: now,
         openingAttack: player.attack
     };
     for (const other of enemies) {
@@ -1158,6 +1165,148 @@ function drawBrickWallEncounter(encounter, now) {
     }
 }
 
+function drawButterflyNet(encounter) {
+    const crab = encounter.crab;
+    const netCenterX = crab.x;
+    const netCenterY = crab.y + crab.height * 0.43;
+    const handleX = player.x + (player.direction === 'left' ? -1 : 1) * player.height * 0.18;
+    const handleY = player.y + player.height * 0.48;
+    const rimWidth = crab.width * 0.68;
+    const rimHeight = crab.height * 0.58;
+
+    ctx.strokeStyle = '#6b4b2a';
+    ctx.lineWidth = Math.max(4, player.height * 0.025);
+    ctx.beginPath();
+    ctx.moveTo(handleX, handleY);
+    ctx.lineTo(netCenterX, netCenterY);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#d8e8e8';
+    ctx.lineWidth = Math.max(3, player.height * 0.018);
+    ctx.beginPath();
+    ctx.ellipse(netCenterX, netCenterY, rimWidth / 2, rimHeight / 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    for (const offset of [-0.25, 0, 0.25]) {
+        ctx.beginPath();
+        ctx.moveTo(netCenterX + rimWidth * offset, netCenterY - rimHeight * 0.42);
+        ctx.lineTo(netCenterX + rimWidth * offset * 0.55, netCenterY + rimHeight * 0.42);
+        ctx.stroke();
+    }
+}
+
+function drawCrabCookingPot(encounter, now) {
+    const crab = encounter.crab;
+    const centerX = crab.x;
+    const floorY = encounter.floorY;
+    const stoveWidth = crab.width * 1.5;
+    const stoveHeight = crab.height * 0.48;
+    const stoveTop = floorY - stoveHeight;
+    const potWidth = crab.width * 0.92;
+    const potHeight = crab.height * 0.76;
+    const potTop = stoveTop - potHeight * 0.72;
+    const rimY = potTop + potHeight * 0.16;
+
+    ctx.fillStyle = '#4a4a4a';
+    ctx.strokeStyle = '#b8b8b8';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(centerX - stoveWidth / 2, stoveTop + 8);
+    ctx.lineTo(centerX + stoveWidth / 2, stoveTop + 8);
+    ctx.lineTo(centerX + stoveWidth * 0.43, floorY - 5);
+    ctx.lineTo(centerX - stoveWidth * 0.43, floorY - 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#202020';
+    ctx.beginPath();
+    ctx.ellipse(centerX, stoveTop + 5, stoveWidth * 0.38, crab.height * 0.08, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    const steamPhase = now / 180;
+    ctx.strokeStyle = '#e5e5e5';
+    ctx.lineWidth = Math.max(3, crab.height * 0.035);
+    for (let index = -1; index <= 1; index++) {
+        const steamX = centerX + index * potWidth * 0.23;
+        const sway = Math.sin(steamPhase + index) * crab.width * 0.08;
+        ctx.beginPath();
+        ctx.moveTo(steamX, potTop - crab.height * 0.04);
+        ctx.quadraticCurveTo(steamX - sway, potTop - crab.height * 0.25,
+            steamX + sway, potTop - crab.height * 0.42);
+        ctx.quadraticCurveTo(steamX + sway * 1.5, potTop - crab.height * 0.58,
+            steamX - sway * 0.4, potTop - crab.height * 0.72);
+        ctx.stroke();
+    }
+
+    ctx.fillStyle = '#777777';
+    ctx.strokeStyle = '#d2d2d2';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(centerX - potWidth / 2, potTop + potHeight * 0.12);
+    ctx.quadraticCurveTo(centerX - potWidth * 0.46, potTop + potHeight * 0.72,
+        centerX - potWidth * 0.32, potTop + potHeight);
+    ctx.lineTo(centerX + potWidth * 0.32, potTop + potHeight);
+    ctx.quadraticCurveTo(centerX + potWidth * 0.46, potTop + potHeight * 0.72,
+        centerX + potWidth / 2, potTop + potHeight * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(centerX, rimY, potWidth / 2, crab.height * 0.09, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#333333';
+    ctx.fill();
+    ctx.stroke();
+
+    for (const side of [-1, 1]) {
+        const clawX = centerX + side * potWidth * 0.34;
+        const clawY = rimY - crab.height * 0.05;
+        ctx.strokeStyle = '#565656';
+        ctx.lineWidth = Math.max(4, crab.height * 0.04);
+        ctx.beginPath();
+        ctx.moveTo(centerX + side * potWidth * 0.2, rimY + crab.height * 0.08);
+        ctx.lineTo(clawX, clawY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(clawX, clawY, crab.height * 0.09, 0, Math.PI * 2);
+        ctx.fillStyle = '#555555';
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(clawX + side * crab.height * 0.04, clawY - crab.height * 0.04);
+        ctx.lineTo(clawX + side * crab.height * 0.14, clawY - crab.height * 0.1);
+        ctx.moveTo(clawX + side * crab.height * 0.04, clawY + crab.height * 0.04);
+        ctx.lineTo(clawX + side * crab.height * 0.14, clawY + crab.height * 0.1);
+        ctx.stroke();
+    }
+}
+
+function drawChefHat(x, y, height) {
+    const headRadius = height * 0.15;
+    const headY = y + headRadius;
+    const hatWidth = headRadius * 2.5;
+    const hatHeight = headRadius * 1.15;
+    const hatBottom = headY - headRadius * 0.72;
+
+    ctx.fillStyle = '#f5f5f5';
+    ctx.strokeStyle = '#333333';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(x - hatWidth / 2, hatBottom);
+    ctx.lineTo(x - hatWidth * 0.4, headY - hatHeight * 0.55);
+    ctx.quadraticCurveTo(x - hatWidth * 0.55, headY - hatHeight * 1.35,
+        x - hatWidth * 0.12, headY - hatHeight);
+    ctx.quadraticCurveTo(x, headY - hatHeight * 1.55,
+        x + hatWidth * 0.12, headY - hatHeight);
+    ctx.quadraticCurveTo(x + hatWidth * 0.55, headY - hatHeight * 1.35,
+        x + hatWidth * 0.4, headY - hatHeight * 0.55);
+    ctx.lineTo(x + hatWidth / 2, hatBottom);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillRect(x - hatWidth / 2, hatBottom, hatWidth, headRadius * 0.24);
+    ctx.strokeRect?.(x - hatWidth / 2, hatBottom, hatWidth, headRadius * 0.24);
+}
+
 function drawFloorWords(sectionHeight) {
     const previousFilter = ctx.filter || "none";
     ctx.filter = previousFilter === "none" ? "blur(4px)" : previousFilter + " blur(4px)";
@@ -1199,7 +1348,11 @@ function drawGame(now = getGameTime()) {
     }
     if (brickWallEncounter) {
         drawBrickWallEncounter(brickWallEncounter, now);
-        drawCrab({ ...brickWallEncounter.crab, isMoving: false }, now);
+        if (now - brickWallEncounter.captureTime < CRAB_NET_CAPTURE_DURATION_MS) {
+            drawCrab({ ...brickWallEncounter.crab, isMoving: false }, now);
+        } else {
+            drawCrabCookingPot(brickWallEncounter, now);
+        }
     }
     
     const immunityAge = PLAYER_IMMUNITY_MS - (gameState.immuneUntil - now);
@@ -1207,6 +1360,13 @@ function drawGame(now = getGameTime()) {
     if (now >= gameState.immuneUntil || blinkPhase % 2 === 0) {
         const playerColor = now < gameState.immuneUntil && blinkPhase === 2 ? 'magenta' : 'red';
         drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now, playerColor);
+    }
+    if (brickWallEncounter) {
+        if (now - brickWallEncounter.captureTime < CRAB_NET_CAPTURE_DURATION_MS) {
+            drawButterflyNet(brickWallEncounter);
+        } else {
+            drawChefHat(player.x, player.y, player.height);
+        }
     }
     if (gameState.paused) {
         ctx.filter = "none";
@@ -1261,12 +1421,23 @@ if (typeof document !== 'undefined' && document.addEventListener) {
                     lastKeyboardInputTime = wallNow;
                     for (const pressedKey of Object.keys(keys)) keys[pressedKey] = false;
                     spaceWasDown = false;
+                    spacePressedPending = false;
+                    spacePressedWithShift = false;
                     if (typeof requestAnimationFrame !== "undefined") requestAnimationFrame(gameLoop);
                 }
                 if (e.preventDefault) e.preventDefault();
                 return;
             }
+            const wasDown = keys[key];
             keys[key] = true;
+            if (key === "Space" && !wasDown) {
+                spacePressedPending = true;
+                if (keys.Shift) spacePressedWithShift = true;
+            }
+            if (key === "Shift" && keys.Space) {
+                spacePressedWithShift = true;
+                if (player.attack) player.attack.brickWall = true;
+            }
             lastKeyboardInputTime = getAnimationTime();
             if (e.preventDefault) {
                 e.preventDefault();
