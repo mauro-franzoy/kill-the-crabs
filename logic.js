@@ -172,15 +172,38 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         const facingSign = direction === "left" ? -1 : 1;
         const laughElapsed = now - (player.laughUntil - LAUGH_DURATION_MS);
         const laughPulse = (Math.sin(laughElapsed / 65) + 1) / 2;
-        const headTilt = facingSign * (0.35 + laughPulse * 0.08);
-        const headCenterX = centerX - facingSign * headRadius * 0.18;
+        const headTilt = facingSign * (0.85 + laughPulse * 0.12);
+        const headCenterX = centerX - facingSign * headRadius * 0.35;
+        const previousFont = ctx.font;
+        const previousTextAlign = ctx.textAlign;
+        const previousTextBaseline = ctx.textBaseline;
+        ctx.fillStyle = playerColor;
+        ctx.font = "bold " + Math.max(12, Math.round(headRadius * 0.55)) + "px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const laughText = [
+            { text: "HA", x: 0.95, y: -0.8 },
+            { text: "HA", x: 1.42, y: -0.05 },
+            { text: "HA", x: 1.03, y: 0.62 },
+            { text: "!!", x: 1.72, y: -0.88 }
+        ];
+        for (const word of laughText) {
+            ctx.fillText(word.text, centerX - facingSign * headRadius * word.x, headY + headRadius * word.y);
+        }
+        ctx.font = previousFont;
+        ctx.textAlign = previousTextAlign;
+        ctx.textBaseline = previousTextBaseline;
+
         ctx.beginPath();
         ctx.ellipse(headCenterX, headY, headRadius * 0.9, headRadius, headTilt, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
-        ctx.ellipse(headCenterX + facingSign * headRadius * 0.22, headY + headRadius * 0.23,
-            headRadius * 0.27, headRadius * (0.13 + laughPulse * 0.08), headTilt, 0, Math.PI * 2);
+        ctx.ellipse(headCenterX + facingSign * headRadius * 0.18, headY + headRadius * 0.22,
+            headRadius * 0.48, headRadius * (0.2 + laughPulse * 0.14), headTilt, 0, Math.PI * 2);
+        ctx.fillStyle = "black";
+        ctx.fill();
         ctx.stroke();
+        ctx.fillStyle = playerColor;
     } else {
         ctx.beginPath();
         ctx.arc(centerX, headY, headRadius, 0, Math.PI * 2);
