@@ -401,7 +401,7 @@ function testDrawGame() {
     if (words.length !== expectedWords.length || words.some((word, index) =>
         word.text !== expectedWords[index] || word.x !== mockCanvas.width / 2 ||
         Math.abs(word.y - expectedY[index]) > 0.001 || word.fillStyle !== 'yellow' ||
-        word.textAlign !== 'center' || word.textBaseline !== 'middle' || word.font !== 'bold 160px Arial' || !word.text)) {
+        word.textAlign !== 'center' || word.textBaseline !== 'middle' || word.font !== 'bold 160px Arial' || word.filter !== 'blur(2px)' || !word.text)) {
         console.error('Test failed: each floor should show its centered yellow lowercase word');
         teardownMockEnvironment();
         return false;
@@ -417,12 +417,12 @@ function testLadderPositioning() {
     
     const logic = require('./logic.js');
     
-    logic.drawGame();
+    logic.resizeCanvas();
     
     const sectionHeight = mockCanvas.height / 3;
     
-    const firstLadderX = mockCanvas.width * 0.2;
-    const secondLadderX = mockCanvas.width * 0.5;
+    const firstLadderX = logic.ladders[0].x;
+    const secondLadderX = logic.ladders[1].x;
     
     if (firstLadderX !== 240) {
         console.error('Test failed: first ladder x position should be 240, got', firstLadderX);
@@ -430,8 +430,8 @@ function testLadderPositioning() {
         return false;
     }
     
-    if (secondLadderX !== 600) {
-        console.error('Test failed: second ladder x position should be 600, got', secondLadderX);
+    if (secondLadderX !== 900) {
+        console.error('Test failed: floor 2 to floor 1 ladder x position should be 900, got', secondLadderX);
         teardownMockEnvironment();
         return false;
     }
@@ -531,7 +531,7 @@ function testLadderFloor2ToFloor1Descending() {
     const playerHeight = sectionHeight * 0.8;
     const floor2Y = sectionHeight - playerHeight;
     const floor1Y = sectionHeight * 2 - playerHeight;
-    const ladderX = mockCanvas.width * 0.5;
+    const ladderX = logic.ladders[1].x;
     
     logic.player.x = ladderX;
     logic.player.y = floor2Y;
@@ -646,7 +646,7 @@ function testSpacebarAttackAnimations() {
 
     logic.keys.Space = false;
     logic.updatePlayer();
-    logic.player.x = mockCanvas.width * 0.5;
+    logic.player.x = logic.ladders[1].x;
     logic.player.y = 150;
     logic.keys.ArrowUp = true;
     logic.keys.Space = true;
@@ -803,7 +803,7 @@ function testCombatAttacksAndExplosions() {
     logic.player.attack = { type: "punch", direction: "up", frame: 6 };
     const punchSectionHeight = mockCanvas.height / 3;
     const punchEnemyHeight = logic.player.height / 2;
-    logic.enemies.push({ x: 620, y: punchSectionHeight - punchEnemyHeight, width: punchEnemyHeight * 1.5, height: punchEnemyHeight, floor: 2 });
+    logic.enemies.push({ x: logic.player.x + 20, y: punchSectionHeight - punchEnemyHeight, width: punchEnemyHeight * 1.5, height: punchEnemyHeight, floor: 2 });
     logic.updateEnemies(1000);
     if (logic.enemies.length !== 0 || logic.gameState.score !== 1 || logic.gameState.lives !== 3) {
         console.error("Test failed: punching a crab should remove it and award one point without losing a life");
@@ -815,7 +815,7 @@ function testCombatAttacksAndExplosions() {
     return true;
 }
 
-function testVictoryAtFiftyPoints() {
+function testVictoryAtFifteenKills() {
     setupMockEnvironment();
     const logic = require("./logic.js");
     logic.resizeCanvas();
@@ -823,7 +823,7 @@ function testVictoryAtFiftyPoints() {
     logic.player.currentFloor = 2;
     logic.player.isClimbing = false;
     logic.player.attack = { type: "kick", direction: "right", frame: 6 };
-    logic.gameState.score = 49;
+    logic.gameState.score = 14;
     const enemyHeight = logic.player.height / 2;
     const sectionHeight = mockCanvas.height / 3;
     logic.enemies.push({
@@ -837,8 +837,8 @@ function testVictoryAtFiftyPoints() {
     Math.random = function() { return 0.5; };
     try {
         logic.updateEnemies(1000);
-        if (logic.gameState.score !== 50 || !logic.gameState.gameOver || !logic.gameState.won) {
-            console.error("Test failed: reaching 50 points should trigger a win and end the game");
+        if (logic.gameState.score !== 15 || !logic.gameState.gameOver || !logic.gameState.won) {
+            console.error("Test failed: reaching 15 kills should trigger a win and end the game");
             return false;
         }
         const frozenPlayerX = logic.player.x;
@@ -865,7 +865,7 @@ function testVictoryAtFiftyPoints() {
         Math.random = originalRandom;
         teardownMockEnvironment();
     }
-    console.log("testVictoryAtFiftyPoints passed");
+    console.log("testVictoryAtFifteenKills passed");
     return true;
 }
 function testPlayerDamageImmunityAndGameOver() {
@@ -973,21 +973,24 @@ function testEnemySpawningAndDrawing() {
     logic.resizeCanvas();
     logic.player.x = 590;
     logic.enemies.length = 0;
-    let randomValue = 0.25;
+    let randomValue = 0.5;
+    let randomValues = [];
     const originalRandom = Math.random;
-    Math.random = function() { return randomValue; };
+    Math.random = function() { return randomValues.length ? randomValues.shift() : randomValue; };
 
     try {
+        randomValues = [0.25];
         logic.updateEnemies(1000);
-        logic.updateEnemies(5999);
+        logic.updateEnemies(3749);
         if (logic.enemies.length !== 0) {
-            console.error("Test failed: enemies should spawn only after five seconds");
+            console.error("Test failed: enemies should wait for the randomly selected spawn interval");
             return false;
         }
 
-        logic.updateEnemies(6000);
+        randomValues = [0.99, 0, 0.25, 0];
+        logic.updateEnemies(3750);
         if (logic.enemies.length !== 1) {
-            console.error("Test failed: one enemy should spawn after five seconds");
+            console.error("Test failed: the first spawn group should contain one crab");
             return false;
         }
 
@@ -1002,16 +1005,17 @@ function testEnemySpawningAndDrawing() {
             return false;
         }
 
-        logic.updateEnemies(10999);
+        logic.updateEnemies(8719);
         if (logic.enemies.length !== 1) {
-            console.error("Test failed: no second enemy should spawn before the next five-second interval");
+            console.error("Test failed: the next group should wait for its randomly selected interval");
             return false;
         }
         const firstXBeforeSpawn = firstEnemy.x;
-        logic.updateEnemies(11000);
-        if (logic.enemies.length !== 2 ||
+        randomValues = [0.9999, 0.99, 0.25, 0, 0.25, 0, 0.25, 0];
+        logic.updateEnemies(8720);
+        if (logic.enemies.length !== 4 ||
             Math.abs(firstEnemy.x - firstXBeforeSpawn - logic.player.speed / 2) > 0.001) {
-            console.error("Test failed: another crab should spawn and existing crabs should chase at half player speed");
+            console.error("Test failed: a random group of three crabs should spawn and existing crabs should chase at half player speed");
             return false;
         }
 
@@ -1019,7 +1023,7 @@ function testEnemySpawningAndDrawing() {
         logic.player.isClimbing = true;
         randomValue = 0.25;
         const firstRoamStartX = firstEnemy.x;
-        logic.updateEnemies(11001);
+        logic.updateEnemies(8721);
         if (firstEnemy.roamDirection !== -1 ||
             Math.abs(firstEnemy.x - (firstRoamStartX - logic.player.speed / 2)) > 0.001) {
             console.error("Test failed: crab should randomly roam left at half player speed while the player climbs");
@@ -1029,7 +1033,7 @@ function testEnemySpawningAndDrawing() {
         randomValue = 0.75;
         secondEnemy.isRoaming = false;
         const secondRoamStartX = secondEnemy.x;
-        logic.updateEnemies(11002);
+        logic.updateEnemies(8722);
         if (firstEnemy.roamDirection !== -1 ||
             secondEnemy.roamDirection !== 1 ||
             Math.abs(firstEnemy.x - (firstRoamStartX - logic.player.speed)) > 0.001 ||
@@ -1138,7 +1142,7 @@ function runAllTests() {
         testLadderFloor2ToFloor1Descending(),
         testSpacebarAttackAnimations(),
         testCombatAttacksAndExplosions(),
-        testVictoryAtFiftyPoints(),
+        testVictoryAtFifteenKills(),
         testPlayerDamageImmunityAndGameOver(),
         testEnemySpawningAndDrawing(),
         testFindClosestFloor()
@@ -1170,7 +1174,7 @@ if (typeof module !== 'undefined' && module.exports) {
         testLadderFloor2ToFloor1Descending,
         testSpacebarAttackAnimations,
         testCombatAttacksAndExplosions,
-        testVictoryAtFiftyPoints,
+        testVictoryAtFifteenKills,
         testPlayerDamageImmunityAndGameOver,
         testEnemySpawningAndDrawing,
         testFindClosestFloor,

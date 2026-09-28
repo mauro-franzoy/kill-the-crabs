@@ -41,9 +41,14 @@ const explosionEffects = [];
 const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false, won: false };
 const PLAYER_IMMUNITY_MS = 8000;
 const EXPLOSION_DURATION_MS = 300;
-const ENEMY_SPAWN_INTERVAL_MS = 5000;
+const ENEMY_MIN_SPAWN_INTERVAL_MS = 2000;
+const ENEMY_MAX_SPAWN_INTERVAL_MS = 5000;
 const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
-let lastEnemySpawnTime = null;
+let nextEnemySpawnTime = null;
+
+function getRandomEnemySpawnInterval() {
+    return ENEMY_MIN_SPAWN_INTERVAL_MS + Math.floor(Math.random() * (ENEMY_MAX_SPAWN_INTERVAL_MS - ENEMY_MIN_SPAWN_INTERVAL_MS + 1));
+}
 
 function updateGameData() {
     if (typeof document === "undefined" || !document.getElementById) return;
@@ -78,7 +83,7 @@ function resizeCanvas() {
         width: 40
     });
     ladders.push({
-        x: canvas.width * 0.5,
+        x: canvas.width * 0.75,
         y1: sectionHeight,
         y2: sectionHeight * 2,
         width: 40
@@ -498,12 +503,13 @@ function findClosestFloor(playerY, floorY) {
 
 function updateEnemies(now = getAnimationTime()) {
     if (gameState.gameOver) return;
-    if (lastEnemySpawnTime === null) {
-        lastEnemySpawnTime = now;
-    } else if (now - lastEnemySpawnTime >= ENEMY_SPAWN_INTERVAL_MS) {
-        lastEnemySpawnTime = now;
+    if (nextEnemySpawnTime === null) {
+        nextEnemySpawnTime = now + getRandomEnemySpawnInterval();
+    } else if (now >= nextEnemySpawnTime) {
+        nextEnemySpawnTime = now + getRandomEnemySpawnInterval();
         const enemyHeight = player.height / 2;
         const enemyWidth = enemyHeight * 1.5;
+        const spawnCount = 1 + Math.floor(Math.random() * 3);
         if (enemyHeight > 0 && enemyWidth <= canvas.width) {
             const minX = enemyWidth / 2;
             const maxX = canvas.width - enemyWidth / 2;
@@ -516,29 +522,31 @@ function updateEnemies(now = getAnimationTime()) {
             ].filter(([rangeStart, rangeEnd]) => rangeEnd >= rangeStart);
             const totalRange = validRanges.reduce((sum, [rangeStart, rangeEnd]) => sum + rangeEnd - rangeStart, 0);
             if (totalRange > 0) {
-                let randomX = Math.random() * totalRange;
-                let enemyX = minX;
-                for (const [rangeStart, rangeEnd] of validRanges) {
-                    const rangeLength = rangeEnd - rangeStart;
-                    if (randomX <= rangeLength) {
-                        enemyX = rangeStart + randomX;
-                        break;
+                for (let spawnIndex = 0; spawnIndex < spawnCount; spawnIndex++) {
+                    let randomX = Math.random() * totalRange;
+                    let enemyX = minX;
+                    for (const [rangeStart, rangeEnd] of validRanges) {
+                        const rangeLength = rangeEnd - rangeStart;
+                        if (randomX <= rangeLength) {
+                            enemyX = rangeStart + randomX;
+                            break;
+                        }
+                        randomX -= rangeLength;
                     }
-                    randomX -= rangeLength;
-                }
 
-                const sectionHeight = canvas.height / 3;
-                const floorSurfaces = [sectionHeight, sectionHeight * 2, canvas.height - 15];
-                const floorSurface = floorSurfaces[Math.floor(Math.random() * floorSurfaces.length)];
-                enemies.push({
-                    x: enemyX,
-                    y: floorSurface - enemyHeight,
-                    width: enemyWidth,
-                    height: enemyHeight,
-                    floor: 2 - floorSurfaces.indexOf(floorSurface),
-                    roamDirection: null,
-                    isRoaming: false
-                });
+                    const sectionHeight = canvas.height / 3;
+                    const floorSurfaces = [sectionHeight, sectionHeight * 2, canvas.height - 15];
+                    const floorSurface = floorSurfaces[Math.floor(Math.random() * floorSurfaces.length)];
+                    enemies.push({
+                        x: enemyX,
+                        y: floorSurface - enemyHeight,
+                        width: enemyWidth,
+                        height: enemyHeight,
+                        floor: 2 - floorSurfaces.indexOf(floorSurface),
+                        roamDirection: null,
+                        isRoaming: false
+                    });
+                }
             }
         }
     }
@@ -719,7 +727,7 @@ function resolveEnemyCollisions(now) {
             });
             gameState.score += 1;
             updateGameData();
-            if (gameState.score >= 50) {
+            if (gameState.score >= 15) {
                 gameState.won = true;
                 gameState.gameOver = true;
                 break;
@@ -823,6 +831,8 @@ function drawCrabExplosion(explosion, now) {
     ctx.globalAlpha = previousAlpha;
 }
 function drawFloorWords(sectionHeight) {
+    const previousFilter = ctx.filter || "none";
+    ctx.filter = previousFilter === "none" ? "blur(2px)" : previousFilter + " blur(2px)";
     const floorWords = [
         { text: 'kill', y: sectionHeight / 2 },
         { text: 'the', y: sectionHeight * 1.5 },
@@ -836,6 +846,7 @@ function drawFloorWords(sectionHeight) {
     for (const floorWord of floorWords) {
         ctx.fillText(floorWord.text, canvas.width / 2, floorWord.y);
     }
+    ctx.filter = previousFilter;
 }
 
 function drawGame(now = getAnimationTime()) {
