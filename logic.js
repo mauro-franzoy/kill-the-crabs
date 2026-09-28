@@ -231,8 +231,8 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         const mouthOpening = faceRadius * (0.12 + laughPulse * 0.3);
         ctx.beginPath();
         ctx.moveTo(mouthX - mouthHalfWidth, mouthY);
-        ctx.quadraticCurveTo(mouthX, mouthY - mouthOpening, mouthX + mouthHalfWidth, mouthY);
-        ctx.quadraticCurveTo(mouthX, mouthY + mouthOpening, mouthX - mouthHalfWidth, mouthY);
+        ctx.quadraticCurveTo(mouthX, mouthY - mouthOpening * 0.08, mouthX + mouthHalfWidth, mouthY);
+        ctx.quadraticCurveTo(mouthX, mouthY + mouthOpening * 1.2, mouthX - mouthHalfWidth, mouthY);
         ctx.closePath();
         ctx.fillStyle = "black";
         ctx.fill();
