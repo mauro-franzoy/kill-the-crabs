@@ -1146,7 +1146,8 @@ if (typeof module !== 'undefined' && module.exports) {
         updateEnemies,
         drawCrab,
         findClosestFloor,
-        drawGame
+        drawGame,
+        gameLoop
     };
 }
 

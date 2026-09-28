@@ -6,11 +6,18 @@ let mockScoreElement = null;
 let mockLivesElement = null;
 let mockGameInstructions = null;
 let originalSetTimeout = null;
+let originalPerformance = null;
+let mockNow = 0;
+let mockAnimationFrameCallbacks = [];
+let mockDocumentListeners = null;
 
 function setupMockEnvironment() {
     mockScoreElement = { textContent: "0" };
     mockLivesElement = { textContent: "3" };
     mockGameInstructions = null;
+    mockNow = 1000;
+    mockAnimationFrameCallbacks = [];
+    mockDocumentListeners = {};
     mockCanvas = {
         width: 1200,
         height: 800,
@@ -37,6 +44,7 @@ function setupMockEnvironment() {
         strokeCalls: [],
         strokeStyles: [],
         strokeFilters: [],
+        strokeAlphas: [],
         arcCalls: [],
         ellipseCalls: [],
         
@@ -66,6 +74,7 @@ function setupMockEnvironment() {
             this.strokeCalls.push([...this.currentPath]);
             this.strokeStyles.push(this.strokeStyle);
             this.strokeFilters.push(this.filter);
+            this.strokeAlphas.push(this.globalAlpha);
             this.lastPath = this.currentPath;
         },
 
@@ -101,6 +110,8 @@ function setupMockEnvironment() {
     originalWindow = global.window;
     originalDocument = global.document;
     originalSetTimeout = global.setTimeout;
+    originalPerformance = global.performance;
+    global.performance = { now: function() { return mockNow; } };
     
     global.window = {
         innerWidth: 1200,
@@ -118,10 +129,10 @@ function setupMockEnvironment() {
             }
             return null;
         },
-        addEventListener: function() {}
+        addEventListener: function(type, listener) { mockDocumentListeners[type] = listener; }
     };
     
-    global.requestAnimationFrame = function() {};
+    global.requestAnimationFrame = function(callback) { mockAnimationFrameCallbacks.push(callback); };
     global.canvas = mockCanvas;
     global.ctx = mockCtx;
 }
@@ -130,6 +141,7 @@ function teardownMockEnvironment() {
     global.window = originalWindow;
     global.document = originalDocument;
     global.setTimeout = originalSetTimeout;
+    global.performance = originalPerformance;
     delete global.requestAnimationFrame;
     delete global.canvas;
     delete global.ctx;
@@ -162,6 +174,61 @@ function testGameInstructionsDisappearAfterTenSeconds() {
     }
 
     console.log("testGameInstructionsDisappearAfterTenSeconds passed");
+    return true;
+}
+
+function testIdlePauseAndResume() {
+    setupMockEnvironment();
+    const logic = require("./logic.js");
+    logic.resizeCanvas();
+    logic.player.x = 300;
+    logic.keys.ArrowRight = true;
+    logic.enemies.push({ x: 100, y: 100, width: 60, height: 60, floor: 1, isMoving: false });
+
+    try {
+        logic.gameLoop(10999);
+        mockAnimationFrameCallbacks.length = 0;
+        if (logic.gameState.paused) {
+            console.error("Test failed: the game should continue until ten seconds without keyboard input");
+            return false;
+        }
+        const playerXAtTimeout = logic.player.x;
+        const enemyXAtTimeout = logic.enemies[0].x;
+        logic.gameLoop(11000);
+        if (!logic.gameState.paused || logic.player.x !== playerXAtTimeout || logic.enemies[0].x !== enemyXAtTimeout) {
+            console.error("Test failed: ten seconds without keyboard input should pause and freeze gameplay");
+            return false;
+        }
+        const pausedMessage = mockCtx.fillTextCalls.slice(-1)[0];
+        if (!pausedMessage || pausedMessage.text !== "SPACEBAR TO RESUME" ||
+            !mockCtx.strokeFilters.includes("blur(16px)")) {
+            console.error("Test failed: idle pause should show its resume banner over a blurred scene");
+            return false;
+        }
+        if (mockAnimationFrameCallbacks.length !== 0) {
+            console.error("Test failed: idle pause should stop scheduling animation frames");
+            return false;
+        }
+
+        mockNow = 12000;
+        mockDocumentListeners.keydown({ code: "Space", key: " ", preventDefault: function() {} });
+        if (logic.gameState.paused || mockAnimationFrameCallbacks.length !== 1 ||
+            Object.values(logic.keys).some(isPressed => isPressed)) {
+            console.error("Test failed: Space should resume gameplay and clear held keys");
+            return false;
+        }
+        mockNow = 12010;
+        mockDocumentListeners.keydown({ code: "ArrowRight", key: "ArrowRight", preventDefault: function() {} });
+        const resumeFrame = mockAnimationFrameCallbacks.shift();
+        resumeFrame(12010);
+        if (logic.player.x !== playerXAtTimeout + logic.player.speed || logic.gameState.paused) {
+            console.error("Test failed: gameplay should advance after resuming and pressing a movement key");
+            return false;
+        }
+    } finally {
+        teardownMockEnvironment();
+    }
+    console.log("testIdlePauseAndResume passed");
     return true;
 }
 
@@ -877,7 +944,70 @@ function testCombatAttacksAndExplosions() {
         teardownMockEnvironment();
         return false;
     }
+    logic.player.attack = null;
+    const laughStrokeStart = mockCtx.strokeCalls.length;
+    const laughTextStart = mockCtx.fillTextCalls.length;
+    const laughFillStart = mockCtx.fillCalls.length;
+    const laughEllipseStart = mockCtx.ellipseCalls.length;
     logic.drawGame(1000);
+    const laughTexts = mockCtx.fillTextCalls.slice(laughTextStart).filter(call => call.text === "HA!");
+    const faceRadius = logic.player.height * 0.15 * 1.5;
+    const laughFace = mockCtx.ellipseCalls.slice(laughEllipseStart).find(call =>
+        Math.abs(call.radiusX - faceRadius * 0.9) < 0.001 && Math.abs(call.radiusY - faceRadius) < 0.001);
+    const laughStrokeCalls = mockCtx.strokeCalls.slice(laughStrokeStart);
+    const laughEyePaths = laughStrokeCalls.filter(path => {
+        if (path.length !== 4 || path[0].type !== "move" || path[1].type !== "line" ||
+            path[2].type !== "move" || path[3].type !== "line") return false;
+        const firstSlope = (path[1].y - path[0].y) / (path[1].x - path[0].x);
+        const secondSlope = (path[3].y - path[2].y) / (path[3].x - path[2].x);
+        const averageX = (path[0].x + path[1].x + path[2].x + path[3].x) / 4;
+        return firstSlope * secondSlope < 0 && Math.abs(averageX - (logic.player.x - faceRadius * 0.35)) < faceRadius;
+    });
+    const tearPathIndices = laughStrokeCalls.map((path, index) => ({ path, index }))
+        .filter(item => item.path.filter(point => point.type === "quadratic").length === 4);
+    const laughTear = tearPathIndices.length ? tearPathIndices[0].path : [];
+    const tearEndpoints = laughTear.filter(point => typeof point.x === "number" && typeof point.y === "number");
+    const tearCenterX = tearEndpoints.reduce((sum, point) => sum + point.x, 0) / (tearEndpoints.length || 1);
+    const tearCenterY = tearEndpoints.reduce((sum, point) => sum + point.y, 0) / (tearEndpoints.length || 1);
+    const eyeCenterX = laughEyePaths.length ? laughEyePaths[0].reduce((sum, point) => sum + point.x, 0) / 4 : 0;
+    const eyeCenterY = laughEyePaths.length ? laughEyePaths[0].reduce((sum, point) => sum + point.y, 0) / 4 : 0;
+    if (laughTexts.length !== 3 || !laughFace || laughFace.rotation < 1.38 || laughFace.rotation > 1.5 ||
+        laughEyePaths.length !== 1 || tearPathIndices.length !== 1 || tearCenterX >= eyeCenterX ||
+        Math.abs(tearCenterX - eyeCenterX) < faceRadius * 0.4 || tearCenterY <= eyeCenterY ||
+        mockCtx.strokeStyles[laughStrokeStart + tearPathIndices[0].index] !== "red" ||
+        mockCtx.fillCalls.slice(laughFillStart).some(call => call.fillStyle === "red") ||
+        !mockCtx.fillCalls.slice(laughFillStart).some(call => call.fillStyle === "black")) {
+        console.error("Test failed: a crab kill should draw the enlarged tilted laughing face, one X eye, a hollow red tear, and three HA messages");
+        teardownMockEnvironment();
+        return false;
+    }
+    const firstLaughMouth = mockCtx.fillCalls.slice(laughFillStart).find(call => call.fillStyle === "black");
+    logic.drawStickman(logic.player.x, logic.player.y, logic.player.height, logic.player.direction,
+        logic.player.animationFrame, logic.player.isClimbing, null, 1065);
+    const secondLaughMouth = mockCtx.fillCalls.slice(laughFillStart).filter(call => call.fillStyle === "black")[1];
+    if (!firstLaughMouth || !secondLaughMouth || firstLaughMouth.path[0].x !== secondLaughMouth.path[0].x ||
+        firstLaughMouth.path[1].x !== secondLaughMouth.path[1].x ||
+        firstLaughMouth.path[1].controlY === secondLaughMouth.path[1].controlY ||
+        firstLaughMouth.path[2].controlY === secondLaughMouth.path[2].controlY) {
+        console.error("Test failed: laughing mouth should open and close vertically while its side tips stay fixed");
+        teardownMockEnvironment();
+        return false;
+    }
+    const deathEffectStartTime = logic.crabDeathEffects[0].startTime;
+    let flickerStrokeStart = mockCtx.strokeCalls.length;
+    logic.drawGame(deathEffectStartTime + 600);
+    const visibleFlickerAlpha = mockCtx.strokeAlphas.slice(flickerStrokeStart)
+        .filter((alpha, index) => mockCtx.strokeStyles[flickerStrokeStart + index] === "darkgray");
+    flickerStrokeStart = mockCtx.strokeCalls.length;
+    logic.drawGame(deathEffectStartTime + 680);
+    const hiddenFlickerAlpha = mockCtx.strokeAlphas.slice(flickerStrokeStart)
+        .filter((alpha, index) => mockCtx.strokeStyles[flickerStrokeStart + index] === "darkgray");
+    if (!visibleFlickerAlpha.length || visibleFlickerAlpha.some(alpha => alpha !== 0.3) ||
+        !hiddenFlickerAlpha.length || hiddenFlickerAlpha.some(alpha => alpha !== 1)) {
+        console.error("Test failed: flipped crab should flicker during the end of its death animation");
+        teardownMockEnvironment();
+        return false;
+    }
     if (mockCtx.strokeCalls.length === 0 || mockCtx.globalAlpha !== 1) {
         console.error("Test failed: flipped crab should draw and restore canvas alpha");
         teardownMockEnvironment();
@@ -917,6 +1047,44 @@ function testCombatAttacksAndExplosions() {
     }
     teardownMockEnvironment();
     console.log("testCombatAttacksAndExplosions passed");
+    return true;
+}
+
+function testCrabDeathFollowsHitDirection() {
+    const scenarios = [
+        { direction: "left", type: "kick", playerDirection: "left", enemyX: playerX => playerX - 213.3333333333,
+            enemyY: (sectionHeight, enemyHeight) => sectionHeight - enemyHeight, expectedX: -1, expectedY: 0 },
+        { direction: "down", type: "kick", playerDirection: "right", enemyX: playerX => playerX,
+            enemyY: sectionHeight => sectionHeight, expectedX: 0, expectedY: 1 },
+        { direction: "up", type: "punch", playerDirection: "right", enemyX: playerX => playerX + 20,
+            enemyY: (sectionHeight, enemyHeight, playerY) => playerY - enemyHeight * 1.1, expectedX: 0, expectedY: -1 }
+    ];
+    for (const scenario of scenarios) {
+        setupMockEnvironment();
+        const logic = require("./logic.js");
+        logic.resizeCanvas();
+        logic.player.x = 600;
+        logic.player.direction = scenario.playerDirection;
+        const sectionHeight = mockCanvas.height / 3;
+        const enemyHeight = logic.player.height / 2;
+        logic.enemies.push({ x: scenario.enemyX(logic.player.x),
+            y: scenario.enemyY(sectionHeight, enemyHeight, logic.player.y), width: enemyHeight * 1.5,
+            height: enemyHeight, floor: 2 });
+        logic.player.attack = { type: scenario.type, direction: scenario.direction, frame: 6 };
+        logic.updateEnemies(1000);
+        const effect = logic.crabDeathEffects[0];
+        const matchesX = scenario.expectedX === 0 ? effect && effect.velocityX === 0 :
+            effect && Math.sign(effect.velocityX) === scenario.expectedX;
+        const matchesY = scenario.expectedY === 0 ? effect && effect.velocityY < 0 :
+            effect && Math.sign(effect.velocityY) === scenario.expectedY;
+        if (logic.enemies.length !== 0 || !matchesX || !matchesY) {
+            console.error("Test failed: crab death should launch in the direction of a " + scenario.direction + " attack");
+            teardownMockEnvironment();
+            return false;
+        }
+        teardownMockEnvironment();
+    }
+    console.log("testCrabDeathFollowsHitDirection passed");
     return true;
 }
 
@@ -1252,6 +1420,22 @@ function testEnemySpawningAndDrawing() {
             return false;
         }
 
+        while (logic.enemies.length < 9) {
+            logic.enemies.push({ x: 100, y: sectionHeight - logic.player.height / 2, width: firstEnemy.width,
+                height: firstEnemy.height, floor: 2, isMoving: false, isRoaming: false });
+        }
+        randomValue = 0.99;
+        logic.updateEnemies(20000);
+        if (logic.enemies.length !== 10) {
+            console.error("Test failed: a spawn group should stop at ten visible crabs");
+            return false;
+        }
+        logic.updateEnemies(25000);
+        if (logic.enemies.length !== 10) {
+            console.error("Test failed: spawning should remain paused while ten crabs are visible");
+            return false;
+        }
+
         const fillStart = mockCtx.fillCalls.length;
         const ellipseStart = mockCtx.ellipseCalls.length;
         const strokeStart = mockCtx.strokeCalls.length;
@@ -1282,6 +1466,7 @@ function runAllTests() {
     
     const results = [
         testGameInstructionsDisappearAfterTenSeconds(),
+        testIdlePauseAndResume(),
         testDrawFloorLines(),
         testDrawLadder(),
         testDrawStickman(),
@@ -1295,6 +1480,7 @@ function runAllTests() {
         testLadderFloor2ToFloor1Descending(),
         testSpacebarAttackAnimations(),
         testCombatAttacksAndExplosions(),
+        testCrabDeathFollowsHitDirection(),
         testVictoryAtFifteenKills(),
         testPlayerDamageImmunityAndGameOver(),
         testCrabWalkingAndClaws(),
@@ -1316,6 +1502,7 @@ function runAllTests() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { 
         testGameInstructionsDisappearAfterTenSeconds,
+        testIdlePauseAndResume,
         testDrawFloorLines, 
         testDrawLadder, 
         testDrawStickman,
@@ -1329,6 +1516,7 @@ if (typeof module !== 'undefined' && module.exports) {
         testLadderFloor2ToFloor1Descending,
         testSpacebarAttackAnimations,
         testCombatAttacksAndExplosions,
+        testCrabDeathFollowsHitDirection,
         testVictoryAtFifteenKills,
         testPlayerDamageImmunityAndGameOver,
         testCrabWalkingAndClaws,
