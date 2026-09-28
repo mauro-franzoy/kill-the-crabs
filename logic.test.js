@@ -684,8 +684,18 @@ function testSpacebarAttackAnimations() {
         ? Math.hypot(upPunch[1].x - upPunch[0].x, upPunch[1].y - upPunch[0].y)
         : 0;
     const fistFill = mockCtx.fillCalls[upFillStart];
+    const punchDirectionX = (upPunch[1].x - upPunch[0].x) / upwardPunchLength;
+    const punchDirectionY = (upPunch[1].y - upPunch[0].y) / upwardPunchLength;
+    const fistPoints = fistFill ? fistFill.path.filter(point => typeof point.x === 'number' && typeof point.y === 'number') : [];
+    const fistProjections = fistPoints.map(point => point.x * punchDirectionX + point.y * punchDirectionY);
+    const fistWidths = fistPoints.map(point => point.x * -punchDirectionY + point.y * punchDirectionX);
+    const fistShapeLength = fistProjections.length ? Math.max(...fistProjections) - Math.min(...fistProjections) : 0;
+    const fistShapeWidth = fistWidths.length ? Math.max(...fistWidths) - Math.min(...fistWidths) : 0;
+    const visibleKnuckleLines = mockCtx.strokeStyles.slice(upStrokeStart).filter(style => style === 'darkred').length;
     if (!upPunch || upPunch[1].y >= upPunch[0].y || Math.abs(upwardPunchLength - 160 * 0.2 * 5) > 0.001 ||
         !fistFill || fistFill.fillStyle !== 'red' || fistFill.path.length < 9 ||
+        Math.abs(fistShapeLength - 0.85 * 160 * 0.15 * 3) > 0.001 ||
+        Math.abs(fistShapeWidth - 2 * 160 * 0.15 * 1.2) > 0.001 || visibleKnuckleLines !== 3 ||
         mockCtx.fillCalls.length - upFillStart !== 1) {
         console.error('Test failed: peak upward punch should show a fist at its tip');
         teardownMockEnvironment();

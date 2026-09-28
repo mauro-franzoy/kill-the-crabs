@@ -306,8 +306,8 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
     const unitY = directionY / directionLength;
     const perpendicularX = -unitY;
     const perpendicularY = unitX;
-    const fistLength = headRadius * 1.5;
-    const fistHalfWidth = headRadius * 0.6;
+    const fistLength = headRadius * 3;
+    const fistHalfWidth = headRadius * 1.2;
     const wristX = tipX - unitX * fistLength * 0.4;
     const wristY = tipY - unitY * fistLength * 0.4;
     const knucklesX = tipX + unitX * fistLength * 0.25;
@@ -330,6 +330,7 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
     ctx.strokeStyle = color;
     ctx.stroke();
 
+    ctx.strokeStyle = 'darkred';
     for (let knuckle = -1; knuckle <= 1; knuckle++) {
         const offset = knuckle * fistHalfWidth * 0.38;
         ctx.beginPath();
