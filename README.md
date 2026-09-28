@@ -8,3 +8,4 @@ This is an AI-assisted prototype of a 2D vanilla javascript game.
 
 ![illustrative image](images/kill-the-crabs.png)
 
+play it: [kill-the-crabs](https://mauro-franzoy.github.io/kill-the-crabs/)
