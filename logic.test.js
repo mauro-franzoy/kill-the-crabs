@@ -4,10 +4,13 @@ let originalWindow = null;
 let originalDocument = null;
 let mockScoreElement = null;
 let mockLivesElement = null;
+let mockGameInstructions = null;
+let originalSetTimeout = null;
 
 function setupMockEnvironment() {
     mockScoreElement = { textContent: "0" };
     mockLivesElement = { textContent: "3" };
+    mockGameInstructions = null;
     mockCanvas = {
         width: 1200,
         height: 800,
@@ -97,6 +100,7 @@ function setupMockEnvironment() {
     
     originalWindow = global.window;
     originalDocument = global.document;
+    originalSetTimeout = global.setTimeout;
     
     global.window = {
         innerWidth: 1200,
@@ -108,6 +112,7 @@ function setupMockEnvironment() {
         getElementById: function(id) {
             if (id === "score") return mockScoreElement;
             if (id === "lives") return mockLivesElement;
+            if (id === "game-instructions") return mockGameInstructions;
             if (id === 'gameCanvas') {
                 return mockCanvas;
             }
@@ -124,10 +129,40 @@ function setupMockEnvironment() {
 function teardownMockEnvironment() {
     global.window = originalWindow;
     global.document = originalDocument;
+    global.setTimeout = originalSetTimeout;
     delete global.requestAnimationFrame;
     delete global.canvas;
     delete global.ctx;
     try { delete require.cache[require.resolve("./logic.js")]; } catch(e){}
+}
+
+function testGameInstructionsDisappearAfterTenSeconds() {
+    setupMockEnvironment();
+    const scheduledTimeouts = [];
+    mockGameInstructions = { hidden: false, style: { display: "flex" } };
+    global.setTimeout = function(callback, delay) {
+        scheduledTimeouts.push({ callback, delay });
+        return 1;
+    };
+
+    try {
+        require("./logic.js");
+        const timer = scheduledTimeouts[0];
+        if (!timer || timer.delay !== 10000 || mockGameInstructions.hidden || mockGameInstructions.style.display !== "flex") {
+            console.error("Test failed: instructions should remain visible until the 10-second timer");
+            return false;
+        }
+        timer.callback();
+        if (!mockGameInstructions.hidden || mockGameInstructions.style.display !== "none") {
+            console.error("Test failed: instructions should be hidden after 10 seconds");
+            return false;
+        }
+    } finally {
+        teardownMockEnvironment();
+    }
+
+    console.log("testGameInstructionsDisappearAfterTenSeconds passed");
+    return true;
 }
 
 function testDrawFloorLines() {
@@ -642,12 +677,12 @@ function testSpacebarAttackAnimations() {
         !shoeFill || shoeFill.fillStyle !== 'red' || mockCtx.fillCalls.length - footFillStart !== 6 ||
         toeEllipses.length !== 5 || toeEllipses.some(toe => toe.radiusY <= toe.radiusX || toe.y >= kickFoot[1].y) ||
         toeEllipses.slice(1).some((toe, index) =>
-            Math.abs(toe.radiusX - 160 * 0.15 * 0.85 * 0.28) > 0.001 ||
-            Math.abs(toe.radiusY - 160 * 0.15 * 4 * [0.18, 0.16, 0.14, 0.12][index]) > 0.001) ||
-        Math.abs(bigToe.radiusX - 160 * 0.15 * 0.85 * 0.44) > 0.001 ||
-        Math.abs(bigToe.radiusY - 160 * 0.15 * 4 * 0.22) > 0.001 ||
+            Math.abs(toe.radiusX - 160 * 0.15 * 0.85 * 1.5 * 0.28) > 0.001 ||
+            Math.abs(toe.radiusY - 160 * 0.15 * 4 * 1.5 * [0.18, 0.16, 0.14, 0.12][index]) > 0.001) ||
+        Math.abs(bigToe.radiusX - 160 * 0.15 * 0.85 * 1.5 * 0.44) > 0.001 ||
+        Math.abs(bigToe.radiusY - 160 * 0.15 * 4 * 1.5 * 0.22) > 0.001 ||
         bigToe.x <= kickFoot[1].x || bigToe.rotation <= 0 ||
-        Math.abs(shoeLength - 160 * 0.15 * 4 * 1.22) > 0.001) {
+        Math.abs(shoeLength - 160 * 0.15 * 4 * 1.5 * 1.22) > 0.001) {
         console.error('Test failed: peak kick should show a side-view foot with five upward toes and a thicker inward-curved big toe');
         teardownMockEnvironment();
         return false;
@@ -694,8 +729,8 @@ function testSpacebarAttackAnimations() {
     const visibleKnuckleLines = mockCtx.strokeStyles.slice(upStrokeStart).filter(style => style === 'darkred').length;
     if (!upPunch || upPunch[1].y >= upPunch[0].y || Math.abs(upwardPunchLength - 160 * 0.2 * 5) > 0.001 ||
         !fistFill || fistFill.fillStyle !== 'red' || fistFill.path.length < 9 ||
-        Math.abs(fistShapeLength - 0.85 * 160 * 0.15 * 3) > 0.001 ||
-        Math.abs(fistShapeWidth - 2 * 160 * 0.15 * 1.2) > 0.001 || visibleKnuckleLines !== 3 ||
+        Math.abs(fistShapeLength - 0.85 * 160 * 0.15 * 3 * 1.5) > 0.001 ||
+        Math.abs(fistShapeWidth - 2 * 160 * 0.15 * 1.2 * 1.5) > 0.001 || visibleKnuckleLines !== 3 ||
         mockCtx.fillCalls.length - upFillStart !== 1) {
         console.error('Test failed: peak upward punch should show a fist at its tip');
         teardownMockEnvironment();
@@ -1204,6 +1239,7 @@ function runAllTests() {
     console.log('Running tests...');
     
     const results = [
+        testGameInstructionsDisappearAfterTenSeconds(),
         testDrawFloorLines(),
         testDrawLadder(),
         testDrawStickman(),
@@ -1237,6 +1273,7 @@ function runAllTests() {
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { 
+        testGameInstructionsDisappearAfterTenSeconds,
         testDrawFloorLines, 
         testDrawLadder, 
         testDrawStickman,

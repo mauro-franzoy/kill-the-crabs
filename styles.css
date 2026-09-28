@@ -47,6 +47,10 @@ body {
     line-height: 1.25;
 }
 
+#game-instructions[hidden] {
+    display: none;
+}
+
 .game-info {
     margin: 5px 0;
 }

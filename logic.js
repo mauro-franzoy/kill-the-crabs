@@ -74,7 +74,8 @@ const gameInstructions = document.getElementById("game-instructions");
 if (gameInstructions) {
     setTimeout(() => {
         gameInstructions.hidden = true;
-    }, 5000);
+        gameInstructions.style.display = "none";
+    }, 10000);
 }
 
 function resizeCanvas() {
@@ -213,9 +214,15 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.beginPath();
         ctx.ellipse(headCenterX, headY, faceRadius * 0.9, faceRadius, headTilt, 0, Math.PI * 2);
         ctx.stroke();
+        const mouthX = headCenterX + facingSign * faceRadius * 0.18;
+        const mouthY = headY + faceRadius * 0.22;
+        const mouthHalfWidth = faceRadius * 0.48;
+        const mouthOpening = faceRadius * (0.12 + laughPulse * 0.3);
         ctx.beginPath();
-        ctx.ellipse(headCenterX + facingSign * faceRadius * 0.18, headY + faceRadius * 0.22,
-            faceRadius * 0.48, faceRadius * (0.2 + laughPulse * 0.14), headTilt, 0, Math.PI * 2);
+        ctx.moveTo(mouthX - mouthHalfWidth, mouthY);
+        ctx.quadraticCurveTo(mouthX, mouthY - mouthOpening, mouthX + mouthHalfWidth, mouthY);
+        ctx.quadraticCurveTo(mouthX, mouthY + mouthOpening, mouthX - mouthHalfWidth, mouthY);
+        ctx.closePath();
         ctx.fillStyle = "black";
         ctx.fill();
         ctx.stroke();
