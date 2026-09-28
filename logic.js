@@ -37,10 +37,23 @@ function getAnimationTime() {
 
 const ladders = [];
 const enemies = [];
+const explosionEffects = [];
+const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false };
+const PLAYER_IMMUNITY_MS = 4000;
+const EXPLOSION_DURATION_MS = 300;
 const ENEMY_SPAWN_INTERVAL_MS = 5000;
 const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
 let lastEnemySpawnTime = null;
 
+function updateGameData() {
+    if (typeof document === "undefined" || !document.getElementById) return;
+    const scoreElement = document.getElementById("score");
+    const livesElement = document.getElementById("lives");
+    if (scoreElement) scoreElement.textContent = String(gameState.score);
+    if (livesElement) livesElement.textContent = String(gameState.lives);
+}
+
+updateGameData();
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -368,6 +381,7 @@ function isNearLadder(playerX, playerY, ladderArray) {
 }
 
 function updatePlayer(now = getAnimationTime()) {
+    if (gameState.gameOver) return;
     player.isMoving = false;
     player.isClimbing = false;
     
@@ -483,6 +497,7 @@ function findClosestFloor(playerY, floorY) {
 }
 
 function updateEnemies(now = getAnimationTime()) {
+    if (gameState.gameOver) return;
     if (lastEnemySpawnTime === null) {
         lastEnemySpawnTime = now;
     } else if (now - lastEnemySpawnTime >= ENEMY_SPAWN_INTERVAL_MS) {
@@ -555,8 +570,168 @@ function updateEnemies(now = getAnimationTime()) {
             enemy.x = Math.max(minX, Math.min(maxX, enemy.x));
         }
     }
+    updateExplosionEffects(now);
+    resolveEnemyCollisions(now);
 }
 
+function getAttackContactShape() {
+    const attack = player.attack;
+    if (!attack) return null;
+
+    const progress = Math.sin(Math.PI * attack.frame / ATTACK_DURATION);
+    if (progress <= 0.05) return null;
+
+    const headRadius = player.height * 0.15;
+    const legLength = player.height * 0.25;
+    const armLength = player.height * 0.2;
+    const centerX = player.x;
+    const headY = player.y + headRadius;
+    const bodyTopY = headY + headRadius;
+    const bodyBottomY = bodyTopY + player.height * 0.4;
+    const shoulderY = bodyTopY + player.height * 0.4 * 0.3;
+    const side = attack.type === "kick"
+        ? ((attack.direction === "left" || (attack.direction === "down" && player.direction === "left")) ? -1 : 1)
+        : (player.direction === "left" ? -1 : 1);
+
+    if (attack.type === "kick") {
+        const kickLength = legLength * 5;
+        const kickStartX = side * 10;
+        const kickStartY = legLength;
+        const kickTargetX = attack.direction === "down"
+            ? side * legLength * 0.2
+            : side * Math.sqrt(kickLength * kickLength - legLength * legLength * 0.01);
+        const kickTargetY = attack.direction === "down"
+            ? Math.sqrt(kickLength * kickLength - kickTargetX * kickTargetX)
+            : -legLength * 0.1;
+        const tipX = centerX + kickStartX + (kickTargetX - kickStartX) * progress;
+        const tipY = bodyBottomY + kickStartY + (kickTargetY - kickStartY) * progress;
+        const vectorX = tipX - centerX;
+        const vectorY = tipY - bodyBottomY;
+        const vectorLength = Math.hypot(vectorX, vectorY);
+        if (vectorLength === 0) return null;
+        const toeX = tipX + vectorX / vectorLength * headRadius * 3;
+        const toeY = tipY + vectorY / vectorLength * headRadius * 3;
+        return { type: "kick", x1: centerX, y1: bodyBottomY, x2: toeX, y2: toeY };
+    }
+
+    if (attack.type === "punch") {
+        const punchHorizontal = side * armLength * 0.45;
+        const punchY = attack.direction === "up"
+            ? shoulderY - Math.sqrt(armLength * armLength * 25 - punchHorizontal * punchHorizontal) * progress
+            : shoulderY + armLength * 1.8 * progress;
+        return {
+            type: "punch",
+            x: centerX + punchHorizontal,
+            y: punchY,
+            radius: headRadius * 0.8
+        };
+    }
+
+    return null;
+}
+
+function segmentIntersectsRectangle(x1, y1, x2, y2, rectangle) {
+    const deltaX = x2 - x1;
+    const deltaY = y2 - y1;
+    let minT = 0;
+    let maxT = 1;
+    const clips = [
+        [-deltaX, x1 - rectangle.left],
+        [deltaX, rectangle.right - x1],
+        [-deltaY, y1 - rectangle.top],
+        [deltaY, rectangle.bottom - y1]
+    ];
+
+    for (const [p, q] of clips) {
+        if (p === 0) {
+            if (q < 0) return false;
+            continue;
+        }
+        const t = q / p;
+        if (p < 0) {
+            if (t > maxT) return false;
+            minT = Math.max(minT, t);
+        } else {
+            if (t < minT) return false;
+            maxT = Math.min(maxT, t);
+        }
+    }
+    return true;
+}
+
+function circleIntersectsRectangle(x, y, radius, rectangle) {
+    const closestX = Math.max(rectangle.left, Math.min(x, rectangle.right));
+    const closestY = Math.max(rectangle.top, Math.min(y, rectangle.bottom));
+    return Math.hypot(x - closestX, y - closestY) <= radius;
+}
+
+function getEnemyRectangle(enemy) {
+    return {
+        left: enemy.x - enemy.width / 2,
+        right: enemy.x + enemy.width / 2,
+        top: enemy.y,
+        bottom: enemy.y + enemy.height
+    };
+}
+
+function attackTouchesEnemy(attackShape, enemyRectangle) {
+    if (attackShape.type === "kick") {
+        return segmentIntersectsRectangle(attackShape.x1, attackShape.y1, attackShape.x2, attackShape.y2, enemyRectangle);
+    }
+    return circleIntersectsRectangle(attackShape.x, attackShape.y, attackShape.radius, enemyRectangle);
+}
+
+function playerBodyTouchesEnemy(enemyRectangle) {
+    const halfWidth = Math.max(player.width / 2, player.height * 0.15);
+    const playerRectangle = {
+        left: player.x - halfWidth,
+        right: player.x + halfWidth,
+        top: player.y,
+        bottom: player.y + player.height
+    };
+    return playerRectangle.left < enemyRectangle.right &&
+        playerRectangle.right > enemyRectangle.left &&
+        playerRectangle.top < enemyRectangle.bottom &&
+        playerRectangle.bottom > enemyRectangle.top;
+}
+
+function updateExplosionEffects(now) {
+    for (let index = explosionEffects.length - 1; index >= 0; index--) {
+        if (now - explosionEffects[index].startTime >= EXPLOSION_DURATION_MS) {
+            explosionEffects.splice(index, 1);
+        }
+    }
+}
+
+function resolveEnemyCollisions(now) {
+    const attackShape = getAttackContactShape();
+    const immune = now < gameState.immuneUntil;
+
+    for (let index = enemies.length - 1; index >= 0; index--) {
+        const enemy = enemies[index];
+        const enemyRectangle = getEnemyRectangle(enemy);
+        if (attackShape && attackTouchesEnemy(attackShape, enemyRectangle)) {
+            enemies.splice(index, 1);
+            explosionEffects.push({
+                x: enemy.x,
+                y: enemy.y + enemy.height / 2,
+                startTime: now
+            });
+            gameState.score += 1;
+            updateGameData();
+            continue;
+        }
+
+        if (immune || !playerBodyTouchesEnemy(enemyRectangle)) continue;
+        gameState.lives = Math.max(0, gameState.lives - 1);
+        gameState.immuneUntil = now + PLAYER_IMMUNITY_MS;
+        updateGameData();
+        if (gameState.lives === 0) {
+            gameState.gameOver = true;
+        }
+        break;
+    }
+}
 function drawCrab(enemy) {
     const centerX = enemy.x;
     const centerY = enemy.y + enemy.height * 0.52;
@@ -619,6 +794,29 @@ function drawCrab(enemy) {
     }
 }
 
+function drawCrabExplosion(explosion, now) {
+    const progress = Math.max(0, Math.min(1, (now - explosion.startTime) / EXPLOSION_DURATION_MS));
+    const previousAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = 1 - progress;
+    const radius = 8 + progress * 28;
+    ctx.strokeStyle = "orange";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(explosion.x, explosion.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let ray = 0; ray < 8; ray++) {
+        const angle = ray * Math.PI / 4;
+        ctx.beginPath();
+        ctx.moveTo(explosion.x + Math.cos(angle) * radius * 0.45, explosion.y + Math.sin(angle) * radius * 0.45);
+        ctx.lineTo(explosion.x + Math.cos(angle) * radius * 1.5, explosion.y + Math.sin(angle) * radius * 1.5);
+        ctx.stroke();
+    }
+    ctx.fillStyle = "yellow";
+    ctx.beginPath();
+    ctx.arc(explosion.x, explosion.y, radius * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = previousAlpha;
+}
 function drawFloorWords(sectionHeight) {
     const floorWords = [
         { text: 'kill', y: sectionHeight / 2 },
@@ -651,20 +849,31 @@ function drawGame(now = getAnimationTime()) {
     for (const enemy of enemies) {
         drawCrab(enemy);
     }
+    for (const explosion of explosionEffects) {
+        drawCrabExplosion(explosion, now);
+    }
     
     drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now);
-}
-
-function gameLoop(timestamp) {
-    const now = typeof timestamp === 'number' ? timestamp : getAnimationTime();
-    updatePlayer(now);
-    updateEnemies(now);
-    drawGame(now);
-    if (typeof requestAnimationFrame !== 'undefined') {
-        requestAnimationFrame(gameLoop);
+    if (gameState.gameOver) {
+        ctx.fillStyle = "darkgreen";
+        ctx.font = "bold 96px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
     }
 }
 
+function gameLoop(timestamp) {
+    const now = typeof timestamp === "number" ? timestamp : getAnimationTime();
+    if (!gameState.gameOver) {
+        updatePlayer(now);
+        updateEnemies(now);
+    }
+    drawGame(now);
+    if (!gameState.gameOver && typeof requestAnimationFrame !== "undefined") {
+        requestAnimationFrame(gameLoop);
+    }
+}
 if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('keydown', (e) => {
         const key = e.code === 'Space' || e.key === ' ' ? 'Space' : e.key;
@@ -690,6 +899,8 @@ if (typeof module !== 'undefined' && module.exports) {
         keys,
         ladders,
         enemies,
+        explosionEffects,
+        gameState,
         resizeCanvas,
         drawFloorLines,
         drawLadder,

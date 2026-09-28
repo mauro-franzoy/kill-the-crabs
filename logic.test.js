@@ -2,8 +2,12 @@ let mockCanvas = null;
 let mockCtx = null;
 let originalWindow = null;
 let originalDocument = null;
+let mockScoreElement = null;
+let mockLivesElement = null;
 
 function setupMockEnvironment() {
+    mockScoreElement = { textContent: "0" };
+    mockLivesElement = { textContent: "3" };
     mockCanvas = {
         width: 1200,
         height: 800,
@@ -18,6 +22,7 @@ function setupMockEnvironment() {
         shadowColor: null,
         shadowBlur: null,
         fillStyle: null,
+        globalAlpha: 1,
         font: null,
         textAlign: null,
         textBaseline: null,
@@ -90,6 +95,8 @@ function setupMockEnvironment() {
     
     global.document = {
         getElementById: function(id) {
+            if (id === "score") return mockScoreElement;
+            if (id === "lives") return mockLivesElement;
             if (id === 'gameCanvas') {
                 return mockCanvas;
             }
@@ -736,6 +743,142 @@ function testSpacebarAttackAnimations() {
     return true;
 }
 
+function testCombatAttacksAndExplosions() {
+    setupMockEnvironment();
+    let logic = require("./logic.js");
+    logic.resizeCanvas();
+    logic.player.x = 200;
+    logic.player.currentFloor = 2;
+    logic.player.isClimbing = false;
+    const sectionHeight = mockCanvas.height / 3;
+    const enemyHeight = logic.player.height / 2;
+    logic.enemies.push({
+        x: logic.player.x + logic.player.height * 1.25,
+        y: sectionHeight - enemyHeight,
+        width: enemyHeight * 1.5,
+        height: enemyHeight,
+        floor: 2
+    });
+    logic.player.attack = { type: "kick", direction: "right", frame: 6 };
+    logic.updateEnemies(1000);
+    if (logic.enemies.length !== 0 || logic.gameState.score !== 1 ||
+        logic.gameState.lives !== 3 || logic.explosionEffects.length !== 1 ||
+        mockScoreElement.textContent !== "1") {
+        console.error("Test failed: kicking a crab should remove it, score one, and start an explosion");
+        teardownMockEnvironment();
+        return false;
+    }
+    logic.drawGame(1000);
+    if (!mockCtx.fillCalls.some(call => call.fillStyle === "yellow") || mockCtx.globalAlpha !== 1) {
+        console.error("Test failed: crab explosion should draw an animated burst and restore canvas alpha");
+        teardownMockEnvironment();
+        return false;
+    }
+    logic.updateEnemies(1299);
+    if (logic.explosionEffects.length !== 1) {
+        console.error("Test failed: crab explosion should remain visible during its short animation");
+        teardownMockEnvironment();
+        return false;
+    }
+    logic.updateEnemies(1300);
+    if (logic.explosionEffects.length !== 0) {
+        console.error("Test failed: crab explosion should be removed when its animation ends");
+        teardownMockEnvironment();
+        return false;
+    }
+    teardownMockEnvironment();
+
+    setupMockEnvironment();
+    logic = require("./logic.js");
+    logic.resizeCanvas();
+    logic.player.x = mockCanvas.width * 0.5;
+    logic.player.y = 260;
+    logic.player.currentFloor = 2;
+    logic.player.isClimbing = true;
+    logic.player.attack = { type: "punch", direction: "up", frame: 6 };
+    const punchSectionHeight = mockCanvas.height / 3;
+    const punchEnemyHeight = logic.player.height / 2;
+    logic.enemies.push({ x: 620, y: punchSectionHeight - punchEnemyHeight, width: punchEnemyHeight * 1.5, height: punchEnemyHeight, floor: 2 });
+    logic.updateEnemies(1000);
+    if (logic.enemies.length !== 0 || logic.gameState.score !== 1 || logic.gameState.lives !== 3) {
+        console.error("Test failed: punching a crab should remove it and award one point without losing a life");
+        teardownMockEnvironment();
+        return false;
+    }
+    teardownMockEnvironment();
+    console.log("testCombatAttacksAndExplosions passed");
+    return true;
+}
+
+function testPlayerDamageImmunityAndGameOver() {
+    setupMockEnvironment();
+    const logic = require("./logic.js");
+    logic.resizeCanvas();
+    logic.player.x = 500;
+    logic.player.currentFloor = 2;
+    logic.player.attack = null;
+    const sectionHeight = mockCanvas.height / 3;
+    const enemyHeight = logic.player.height / 2;
+    logic.enemies.push({
+        x: logic.player.x,
+        y: sectionHeight - enemyHeight,
+        width: 60,
+        height: 60,
+        floor: 2
+    });
+    const originalRandom = Math.random;
+    Math.random = function() { return 0.5; };
+    try {
+        logic.updateEnemies(1000);
+        if (logic.gameState.lives !== 2 || logic.gameState.immuneUntil !== 5000 || mockLivesElement.textContent !== "2") {
+            console.error("Test failed: touching the player should remove one life and grant four seconds of immunity");
+            return false;
+        }
+        logic.updateEnemies(4999);
+        if (logic.gameState.lives !== 2) {
+            console.error("Test failed: the player should remain immune until four seconds have elapsed");
+            return false;
+        }
+        logic.updateEnemies(5000);
+        if (logic.gameState.lives !== 1 || logic.gameState.immuneUntil !== 9000) {
+            console.error("Test failed: a crab should hurt the player again after immunity ends");
+            return false;
+        }
+        logic.updateEnemies(8999);
+        if (logic.gameState.lives !== 1) {
+            console.error("Test failed: the second immunity period should prevent repeated damage");
+            return false;
+        }
+        logic.updateEnemies(9000);
+        if (logic.gameState.lives !== 0 || !logic.gameState.gameOver || mockLivesElement.textContent !== "0") {
+            console.error("Test failed: losing the last life should end the game");
+            return false;
+        }
+        const frozenPlayerX = logic.player.x;
+        const frozenEnemyPositions = logic.enemies.map(enemy => enemy.x);
+        logic.keys.ArrowRight = true;
+        logic.updatePlayer(9010);
+        logic.updateEnemies(9010);
+        if (logic.player.x !== frozenPlayerX ||
+            logic.enemies.some((enemy, index) => enemy.x !== frozenEnemyPositions[index])) {
+            console.error("Test failed: player and crabs should freeze after game over");
+            return false;
+        }
+        logic.drawGame(9000);
+        const finalMessage = mockCtx.fillTextCalls.slice(-1)[0];
+        if (!finalMessage || finalMessage.text !== "GAME OVER" ||
+            finalMessage.fillStyle !== "darkgreen" ||
+            finalMessage.x !== mockCanvas.width / 2 || finalMessage.y !== mockCanvas.height / 2) {
+            console.error("Test failed: game over should display large centered dark green text");
+            return false;
+        }
+    } finally {
+        Math.random = originalRandom;
+        teardownMockEnvironment();
+    }
+    console.log("testPlayerDamageImmunityAndGameOver passed");
+    return true;
+}
 function testEnemySpawningAndDrawing() {
     setupMockEnvironment();
 
@@ -907,6 +1050,8 @@ function runAllTests() {
         testPlayerHeightAndFloorPositioning(),
         testLadderFloor2ToFloor1Descending(),
         testSpacebarAttackAnimations(),
+        testCombatAttacksAndExplosions(),
+        testPlayerDamageImmunityAndGameOver(),
         testEnemySpawningAndDrawing(),
         testFindClosestFloor()
     ];
@@ -936,6 +1081,8 @@ if (typeof module !== 'undefined' && module.exports) {
         testPlayerHeightAndFloorPositioning,
         testLadderFloor2ToFloor1Descending,
         testSpacebarAttackAnimations,
+        testCombatAttacksAndExplosions,
+        testPlayerDamageImmunityAndGameOver,
         testEnemySpawningAndDrawing,
         testFindClosestFloor,
         runAllTests
