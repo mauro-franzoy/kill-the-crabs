@@ -386,7 +386,7 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
     }
 }
 
-function drawFistAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') {
+function drawFistAtTip(tipX, tipY, originX, originY, headRadius, color = "red") {
     const directionX = tipX - originX;
     const directionY = tipY - originY;
     const directionLength = Math.hypot(directionX, directionY);
@@ -398,38 +398,70 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
     const perpendicularY = unitX;
     const fistLength = headRadius * 3 * 1.5;
     const fistHalfWidth = headRadius * 1.2 * 1.5;
-    const wristX = tipX - unitX * fistLength * 0.4;
-    const wristY = tipY - unitY * fistLength * 0.4;
-    const knucklesX = tipX + unitX * fistLength * 0.25;
-    const knucklesY = tipY + unitY * fistLength * 0.25;
+    const pointAt = (along, across) => ({
+        x: tipX + unitX * fistLength * along + perpendicularX * fistHalfWidth * across,
+        y: tipY + unitY * fistLength * along + perpendicularY * fistHalfWidth * across
+    });
+    const knuckleCenters = [-0.72, -0.24, 0.24, 0.72];
 
     ctx.beginPath();
-    ctx.moveTo(wristX + perpendicularX * fistHalfWidth * 0.55, wristY + perpendicularY * fistHalfWidth * 0.55);
-    ctx.lineTo(tipX + perpendicularX * fistHalfWidth, tipY + perpendicularY * fistHalfWidth);
-    ctx.lineTo(knucklesX + perpendicularX * fistHalfWidth * 0.9, knucklesY + perpendicularY * fistHalfWidth * 0.9);
-    ctx.lineTo(knucklesX + unitX * fistLength * 0.2 + perpendicularX * fistHalfWidth * 0.55,
-        knucklesY + unitY * fistLength * 0.2 + perpendicularY * fistHalfWidth * 0.55);
-    ctx.lineTo(knucklesX + unitX * fistLength * 0.2 - perpendicularX * fistHalfWidth * 0.55,
-        knucklesY + unitY * fistLength * 0.2 - perpendicularY * fistHalfWidth * 0.55);
-    ctx.lineTo(knucklesX - perpendicularX * fistHalfWidth * 0.9, knucklesY - perpendicularY * fistHalfWidth * 0.9);
-    ctx.lineTo(tipX - perpendicularX * fistHalfWidth, tipY - perpendicularY * fistHalfWidth);
-    ctx.lineTo(wristX - perpendicularX * fistHalfWidth * 0.55, wristY - perpendicularY * fistHalfWidth * 0.55);
+    let point = pointAt(-0.4, -0.55);
+    ctx.moveTo(point.x, point.y);
+    point = pointAt(-0.25, -0.95);
+    let control = pointAt(-0.34, -0.9);
+    ctx.quadraticCurveTo(control.x, control.y, point.x, point.y);
+    point = pointAt(0.12, -0.95);
+    ctx.lineTo(point.x, point.y);
+
+    for (let index = 0; index < knuckleCenters.length; index++) {
+        const center = knuckleCenters[index];
+        if (index > 0) {
+            const previousEnd = knuckleCenters[index - 1] + 0.14;
+            const nextStart = center - 0.14;
+            control = pointAt(0.29, (previousEnd + nextStart) / 2);
+            point = pointAt(0.32, nextStart);
+            ctx.quadraticCurveTo(control.x, control.y, point.x, point.y);
+        }
+        control = pointAt(0.42, center - 0.1);
+        point = pointAt(0.45, center);
+        ctx.quadraticCurveTo(control.x, control.y, point.x, point.y);
+        control = pointAt(0.42, center + 0.1);
+        point = pointAt(0.32, center + 0.14);
+        ctx.quadraticCurveTo(control.x, control.y, point.x, point.y);
+    }
+
+    control = pointAt(0.3, 0.95);
+    point = pointAt(0.12, 1);
+    ctx.quadraticCurveTo(control.x, control.y, point.x, point.y);
+    point = pointAt(-0.18, 0.9);
+    ctx.lineTo(point.x, point.y);
+    control = pointAt(-0.4, 0.78);
+    point = pointAt(-0.4, 0.55);
+    ctx.quadraticCurveTo(control.x, control.y, point.x, point.y);
     ctx.closePath();
     ctx.fillStyle = color;
     ctx.fill();
     ctx.strokeStyle = color;
     ctx.stroke();
 
-    ctx.strokeStyle = 'darkred';
-    for (let knuckle = -1; knuckle <= 1; knuckle++) {
-        const offset = knuckle * fistHalfWidth * 0.38;
+    ctx.strokeStyle = "darkred";
+    for (const center of knuckleCenters) {
+        const creaseStart = pointAt(0.18, center - 0.1);
+        const creaseControl = pointAt(0.34, center - 0.06);
+        const creaseEnd = pointAt(0.33, center + 0.07);
         ctx.beginPath();
-        ctx.moveTo(tipX + unitX * fistLength * 0.02 + perpendicularX * offset,
-            tipY + unitY * fistLength * 0.02 + perpendicularY * offset);
-        ctx.lineTo(tipX + unitX * fistLength * 0.2 + perpendicularX * offset,
-            tipY + unitY * fistLength * 0.2 + perpendicularY * offset);
+        ctx.moveTo(creaseStart.x, creaseStart.y);
+        ctx.quadraticCurveTo(creaseControl.x, creaseControl.y, creaseEnd.x, creaseEnd.y);
         ctx.stroke();
     }
+
+    const thumbStart = pointAt(-0.08, -0.72);
+    const thumbControl = pointAt(0.08, -0.48);
+    const thumbEnd = pointAt(0.24, -0.2);
+    ctx.beginPath();
+    ctx.moveTo(thumbStart.x, thumbStart.y);
+    ctx.quadraticCurveTo(thumbControl.x, thumbControl.y, thumbEnd.x, thumbEnd.y);
+    ctx.stroke();
     ctx.strokeStyle = color;
 }
 
