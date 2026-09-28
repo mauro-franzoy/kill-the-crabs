@@ -641,6 +641,9 @@ function testSpacebarAttackAnimations() {
     if (!kickFoot || kickFoot[1].x >= kickFoot[0].x || Math.abs(horizontalKickLength - 160 * 0.25 * 5) > 0.001 ||
         !shoeFill || shoeFill.fillStyle !== 'red' || mockCtx.fillCalls.length - footFillStart !== 6 ||
         toeEllipses.length !== 5 || toeEllipses.some(toe => toe.radiusY <= toe.radiusX || toe.y >= kickFoot[1].y) ||
+        toeEllipses.slice(1).some((toe, index) =>
+            Math.abs(toe.radiusX - 160 * 0.15 * 0.85 * 0.28) > 0.001 ||
+            Math.abs(toe.radiusY - 160 * 0.15 * 4 * [0.18, 0.16, 0.14, 0.12][index]) > 0.001) ||
         Math.abs(bigToe.radiusX - 160 * 0.15 * 0.85 * 0.44) > 0.001 ||
         Math.abs(bigToe.radiusY - 160 * 0.15 * 4 * 0.22) > 0.001 ||
         bigToe.x <= kickFoot[1].x || bigToe.rotation <= 0 ||

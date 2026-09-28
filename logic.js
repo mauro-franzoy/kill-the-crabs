@@ -282,8 +282,8 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
     for (let toe = 0; toe < toeLengths.length; toe++) {
         const isBigToe = toe === 0;
         const toeX = tipX + bodySide * halfWidth * (toeOffsets[toe] + (isBigToe ? 0.06 : 0));
-        const toeRadiusX = halfWidth * (isBigToe ? 0.44 : 0.14);
-        const toeRadiusY = footLength * toeLengths[toe] * (isBigToe ? 1 : 0.5);
+        const toeRadiusX = halfWidth * (isBigToe ? 0.44 : 0.28);
+        const toeRadiusY = footLength * toeLengths[toe];
         const toeY = toeBaseY - toeRadiusY;
         const toeBend = isBigToe ? bodySide * 0.24 : 0;
 
