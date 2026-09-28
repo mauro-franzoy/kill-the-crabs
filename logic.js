@@ -182,10 +182,10 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const laughText = [
-            { text: "HA", x: 0.95, y: -0.8 },
-            { text: "HA", x: 1.42, y: -0.05 },
-            { text: "HA", x: 1.03, y: 0.62 },
-            { text: "!!", x: 1.72, y: -0.88 }
+            { text: "HA", x: 1.95, y: -0.8 },
+            { text: "HA", x: 2.35, y: -0.05 },
+            { text: "HA", x: 1.98, y: 0.62 },
+            { text: "!!", x: 2.72, y: -0.88 }
         ];
         for (const word of laughText) {
             ctx.fillText(word.text, centerX - facingSign * headRadius * word.x, headY + headRadius * word.y);
@@ -203,6 +203,19 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.fillStyle = "black";
         ctx.fill();
         ctx.stroke();
+        ctx.strokeStyle = playerColor;
+        const eyeY = headY - headRadius * 0.25;
+        const eyeHalfWidth = headRadius * 0.14;
+        const eyeHalfHeight = headRadius * 0.06;
+        for (const eyeSide of [-1, 1]) {
+            const eyeX = headCenterX + eyeSide * headRadius * 0.28;
+            ctx.beginPath();
+            ctx.moveTo(eyeX - eyeHalfWidth, eyeY - eyeHalfHeight);
+            ctx.lineTo(eyeX + eyeHalfWidth, eyeY + eyeHalfHeight);
+            ctx.moveTo(eyeX - eyeHalfWidth, eyeY + eyeHalfHeight);
+            ctx.lineTo(eyeX + eyeHalfWidth, eyeY - eyeHalfHeight);
+            ctx.stroke();
+        }
         ctx.fillStyle = playerColor;
     } else {
         ctx.beginPath();
