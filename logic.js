@@ -172,7 +172,7 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         const facingSign = direction === "left" ? -1 : 1;
         const laughElapsed = now - (player.laughUntil - LAUGH_DURATION_MS);
         const laughPulse = (Math.sin(laughElapsed / 65) + 1) / 2;
-        const headTilt = facingSign * (0.85 + laughPulse * 0.12);
+        const headTilt = facingSign * (1.18 + laughPulse * 0.12);
         const headCenterX = centerX - facingSign * headRadius * 0.35;
         const previousFont = ctx.font;
         const previousTextAlign = ctx.textAlign;
@@ -182,10 +182,9 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const laughText = [
-            { text: "HA", x: 1.95, y: -0.8 },
-            { text: "HA", x: 2.35, y: -0.05 },
-            { text: "HA", x: 1.98, y: 0.62 },
-            { text: "!!", x: 2.72, y: -0.88 }
+            { text: "HA!", x: 1.95, y: -0.8 },
+            { text: "HA!", x: 2.35, y: -0.05 },
+            { text: "HA!", x: 1.98, y: 0.62 }
         ];
         for (const word of laughText) {
             ctx.fillText(word.text, centerX - facingSign * headRadius * word.x, headY + headRadius * word.y);
@@ -204,18 +203,31 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
         ctx.fill();
         ctx.stroke();
         ctx.strokeStyle = playerColor;
-        const eyeY = headY - headRadius * 0.25;
-        const eyeHalfWidth = headRadius * 0.14;
-        const eyeHalfHeight = headRadius * 0.06;
-        for (const eyeSide of [-1, 1]) {
-            const eyeX = headCenterX + eyeSide * headRadius * 0.28;
-            ctx.beginPath();
-            ctx.moveTo(eyeX - eyeHalfWidth, eyeY - eyeHalfHeight);
-            ctx.lineTo(eyeX + eyeHalfWidth, eyeY + eyeHalfHeight);
-            ctx.moveTo(eyeX - eyeHalfWidth, eyeY + eyeHalfHeight);
-            ctx.lineTo(eyeX + eyeHalfWidth, eyeY - eyeHalfHeight);
-            ctx.stroke();
-        }
+        const eyeY = headY - headRadius * 0.43;
+        const eyeHalfWidth = headRadius * 0.38;
+        const eyeHalfHeight = headRadius * 0.15;
+        ctx.beginPath();
+        ctx.moveTo(headCenterX - eyeHalfWidth, eyeY - eyeHalfHeight);
+        ctx.lineTo(headCenterX + eyeHalfWidth, eyeY + eyeHalfHeight);
+        ctx.moveTo(headCenterX - eyeHalfWidth, eyeY + eyeHalfHeight);
+        ctx.lineTo(headCenterX + eyeHalfWidth, eyeY - eyeHalfHeight);
+        ctx.stroke();
+        const tearX = headCenterX + facingSign * eyeHalfWidth * 0.72;
+        const tearY = eyeY + eyeHalfHeight * 0.55;
+        const tearHalfWidth = headRadius * 0.075;
+        const tearHeight = headRadius * 0.13;
+        ctx.beginPath();
+        ctx.moveTo(tearX, tearY - tearHeight);
+        ctx.quadraticCurveTo(tearX + tearHalfWidth, tearY - tearHeight * 0.2, tearX + tearHalfWidth, tearY + tearHeight * 0.35);
+        ctx.quadraticCurveTo(tearX + tearHalfWidth, tearY + tearHeight, tearX, tearY + tearHeight);
+        ctx.quadraticCurveTo(tearX - tearHalfWidth, tearY + tearHeight, tearX - tearHalfWidth, tearY + tearHeight * 0.35);
+        ctx.quadraticCurveTo(tearX - tearHalfWidth, tearY - tearHeight * 0.2, tearX, tearY - tearHeight);
+        ctx.closePath();
+        ctx.fillStyle = "deepskyblue";
+        ctx.strokeStyle = "deepskyblue";
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = playerColor;
         ctx.fillStyle = playerColor;
     } else {
         ctx.beginPath();
