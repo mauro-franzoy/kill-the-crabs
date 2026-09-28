@@ -834,6 +834,7 @@ function drawFloorWords(sectionHeight) {
 }
 
 function drawGame(now = getAnimationTime()) {
+    ctx.filter = gameState.gameOver ? 'blur(8px)' : 'none';
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -860,14 +861,14 @@ function drawGame(now = getAnimationTime()) {
         drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now, playerColor);
     }
     if (gameState.gameOver) {
-        ctx.fillStyle = "black";
-        ctx.fillRect(canvas.width / 2 - 570, canvas.height / 2 - 135, 1140, 270);
+        ctx.filter = "none";
         ctx.fillStyle = "darkgreen";
-        ctx.font = "bold 192px Arial";
+        ctx.font = "900 192px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
     }
+    ctx.filter = "none";
 }
 
 function gameLoop(timestamp) {

@@ -21,6 +21,7 @@ function setupMockEnvironment() {
         lineWidth: null,
         shadowColor: null,
         shadowBlur: null,
+        filter: "none",
         fillStyle: null,
         globalAlpha: 1,
         font: null,
@@ -32,6 +33,7 @@ function setupMockEnvironment() {
         fillCalls: [],
         strokeCalls: [],
         strokeStyles: [],
+        strokeFilters: [],
         arcCalls: [],
         ellipseCalls: [],
         
@@ -54,6 +56,7 @@ function setupMockEnvironment() {
         stroke: function() {
             this.strokeCalls.push([...this.currentPath]);
             this.strokeStyles.push(this.strokeStyle);
+            this.strokeFilters.push(this.filter);
             this.lastPath = this.currentPath;
         },
 
@@ -70,7 +73,7 @@ function setupMockEnvironment() {
         },
 
         fillText: function(text, x, y) {
-            this.fillTextCalls.push({ text, x, y, fillStyle: this.fillStyle, font: this.font, textAlign: this.textAlign, textBaseline: this.textBaseline });
+            this.fillTextCalls.push({ text, x, y, fillStyle: this.fillStyle, font: this.font, textAlign: this.textAlign, textBaseline: this.textBaseline, filter: this.filter });
         },
         
         arc: function(x, y, radius, startAngle, endAngle) {
@@ -883,17 +886,15 @@ function testPlayerDamageImmunityAndGameOver() {
             console.error("Test failed: player and crabs should freeze after game over");
             return false;
         }
+        const gameOverStrokeStart = mockCtx.strokeFilters.length;
         logic.drawGame(17000);
-        const gameOverBox = mockCtx.fillRectCalls.slice(-1)[0];
-        if (!gameOverBox || gameOverBox.fillStyle !== "black" ||
-            gameOverBox.x !== mockCanvas.width / 2 - 570 || gameOverBox.y !== mockCanvas.height / 2 - 135 ||
-            gameOverBox.width !== 1140 || gameOverBox.height !== 270) {
-            console.error("Test failed: game over should have a centered black backing box");
+        if (!mockCtx.strokeFilters.slice(gameOverStrokeStart).includes("blur(8px)")) {
+            console.error("Test failed: the game scene should be blurred behind the game-over message");
             return false;
         }
         const finalMessage = mockCtx.fillTextCalls.slice(-1)[0];
         if (!finalMessage || finalMessage.text !== "GAME OVER" ||
-            finalMessage.fillStyle !== "darkgreen" || finalMessage.font !== "bold 192px Arial" ||
+            finalMessage.fillStyle !== "darkgreen" || finalMessage.font !== "900 192px Arial" || finalMessage.filter !== "none" ||
             finalMessage.x !== mockCanvas.width / 2 || finalMessage.y !== mockCanvas.height / 2) {
             console.error("Test failed: game over should display large centered dark green text");
             return false;
