@@ -574,21 +574,24 @@ function updatePlayer(now = getGameTime()) {
     player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
 
     if (keys.Space && !spaceWasDown) {
-        const attackLadder = isOverLadder(player.x, player.y);
-        const insideLadder = attackLadder && (
-            player.isClimbing || keys.ArrowUp || keys.ArrowDown ||
-            (player.y > attackLadder.y1 - player.height + 10 &&
-                player.y < attackLadder.y2 - player.height - 10)
-        );
-        if (insideLadder) {
-            const climbDirection = keys.ArrowUp
-                ? 'up'
-                : (keys.ArrowDown ? 'down' : (player.lastClimbDirection || 'up'));
-            player.attack = climbDirection === 'up'
-                ? { type: 'punch', direction: 'up', frame: 0, peakTime: null }
-                : { type: 'kick', direction: 'down', frame: 0, peakTime: null };
+        const attackDirection = keys.ArrowUp
+            ? "up"
+            : (keys.ArrowDown ? "down" : (keys.ArrowLeft ? "left" : (keys.ArrowRight ? "right" : null)));
+        if (attackDirection) {
+            player.attack = attackDirection === "up"
+                ? { type: "punch", direction: attackDirection, frame: 0, peakTime: null }
+                : { type: "kick", direction: attackDirection, frame: 0, peakTime: null };
         } else {
-            player.attack = { type: 'kick', direction: player.direction, frame: 0, peakTime: null };
+            const attackLadder = isOverLadder(player.x, player.y);
+            const insideLadder = attackLadder && (
+                player.isClimbing ||
+                (player.y > attackLadder.y1 - player.height + 10 &&
+                    player.y < attackLadder.y2 - player.height - 10)
+            );
+            const fallbackDirection = insideLadder ? (player.lastClimbDirection || "up") : player.direction;
+            player.attack = fallbackDirection === "up"
+                ? { type: "punch", direction: "up", frame: 0, peakTime: null }
+                : { type: "kick", direction: fallbackDirection, frame: 0, peakTime: null };
         }
     }
     spaceWasDown = keys.Space;

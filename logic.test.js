@@ -654,6 +654,30 @@ function testSpacebarAttackAnimations() {
         return false;
     }
 
+    const floorAttackDirections = [
+        { key: "ArrowUp", direction: "up", type: "punch" },
+        { key: "ArrowDown", direction: "down", type: "kick" },
+        { key: "ArrowLeft", direction: "left", type: "kick" },
+        { key: "ArrowRight", direction: "right", type: "kick" }
+    ];
+    for (const attackDirection of floorAttackDirections) {
+        logic.keys.Space = false;
+        for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) logic.keys[key] = false;
+        logic.updatePlayer();
+        logic.keys[attackDirection.key] = true;
+        logic.keys.Space = true;
+        logic.updatePlayer();
+        if (!logic.player.attack || logic.player.attack.direction !== attackDirection.direction ||
+            logic.player.attack.type !== attackDirection.type) {
+            console.error("Test failed: arrow plus space should select the matching attack direction on a floor");
+            teardownMockEnvironment();
+            return false;
+        }
+    }
+    logic.keys.Space = false;
+    for (const key of ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]) logic.keys[key] = false;
+    logic.updatePlayer();
+
     const floorStrokeStart = mockCtx.strokeCalls.length;
     const footFillStart = mockCtx.fillCalls.length;
     const toeEllipseStart = mockCtx.ellipseCalls.length;
@@ -760,6 +784,20 @@ function testSpacebarAttackAnimations() {
         teardownMockEnvironment();
         return false;
     }
+
+    logic.keys.Space = false;
+    logic.updatePlayer();
+    logic.keys.ArrowLeft = true;
+    logic.keys.Space = true;
+    logic.updatePlayer();
+    if (!logic.player.attack || logic.player.attack.direction !== "left" || logic.player.attack.type !== "kick") {
+        console.error("Test failed: arrow plus space should select a horizontal attack beside a ladder");
+        teardownMockEnvironment();
+        return false;
+    }
+    logic.keys.Space = false;
+    logic.keys.ArrowLeft = false;
+    logic.updatePlayer();
 
     const downStrokeStart = mockCtx.strokeCalls.length;
     logic.drawStickman(100, 200, 160, 'left', 0, true, { type: 'kick', direction: 'down', frame: 6 });
