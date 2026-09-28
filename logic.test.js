@@ -401,7 +401,7 @@ function testDrawGame() {
     if (words.length !== expectedWords.length || words.some((word, index) =>
         word.text !== expectedWords[index] || word.x !== mockCanvas.width / 2 ||
         Math.abs(word.y - expectedY[index]) > 0.001 || word.fillStyle !== 'yellow' ||
-        word.textAlign !== 'center' || word.textBaseline !== 'middle' || word.font !== 'bold 160px Arial' || word.filter !== 'blur(2px)' || !word.text)) {
+        word.textAlign !== 'center' || word.textBaseline !== 'middle' || word.font !== 'bold 160px Arial' || word.filter !== 'blur(4px)' || !word.text)) {
         console.error('Test failed: each floor should show its centered yellow lowercase word');
         teardownMockEnvironment();
         return false;
@@ -966,6 +966,48 @@ function testPlayerDamageImmunityAndGameOver() {
     console.log("testPlayerDamageImmunityAndGameOver passed");
     return true;
 }
+function testCrabWalkingAndClaws() {
+    setupMockEnvironment();
+    const logic = require("./logic.js");
+    const crab = { x: 300, y: 200, width: 90, height: 60, isMoving: true };
+    try {
+        let firstStart = mockCtx.strokeCalls.length;
+        logic.drawCrab(crab, 0);
+        const firstFrame = mockCtx.strokeCalls.slice(firstStart);
+        firstStart = mockCtx.strokeCalls.length;
+        logic.drawCrab(crab, 110);
+        const secondFrame = mockCtx.strokeCalls.slice(firstStart);
+        const firstFoot = firstFrame[0][2];
+        const secondFoot = secondFrame[0][2];
+        const firstClawGap = Math.hypot(firstFrame[5][1].x - firstFrame[5][3].x, firstFrame[5][1].y - firstFrame[5][3].y);
+        const secondClawGap = Math.hypot(secondFrame[5][1].x - secondFrame[5][3].x, secondFrame[5][1].y - secondFrame[5][3].y);
+        if (firstFoot.x === secondFoot.x && firstFoot.y === secondFoot.y) {
+            console.error("Test failed: moving crab legs should swing as it walks");
+            return false;
+        }
+        if (Math.abs(firstClawGap - secondClawGap) < 0.001) {
+            console.error("Test failed: crab claws should open and close over time");
+            return false;
+        }
+
+        crab.isMoving = false;
+        firstStart = mockCtx.strokeCalls.length;
+        logic.drawCrab(crab, 0);
+        const idleFirstFrame = mockCtx.strokeCalls.slice(firstStart);
+        firstStart = mockCtx.strokeCalls.length;
+        logic.drawCrab(crab, 110);
+        const idleSecondFrame = mockCtx.strokeCalls.slice(firstStart);
+        if (idleFirstFrame[0][2].x !== idleSecondFrame[0][2].x ||
+            idleFirstFrame[0][2].y !== idleSecondFrame[0][2].y) {
+            console.error("Test failed: stationary crab legs should remain still");
+            return false;
+        }
+    } finally {
+        teardownMockEnvironment();
+    }
+    console.log("testCrabWalkingAndClaws passed");
+    return true;
+}
 function testEnemySpawningAndDrawing() {
     setupMockEnvironment();
 
@@ -998,7 +1040,7 @@ function testEnemySpawningAndDrawing() {
         const playerCenterX = logic.player.x + logic.player.width / 2;
         const minimumDistance = logic.ladders[0].width * 4;
         const sectionHeight = mockCanvas.height / 3;
-        if (firstEnemy.height !== logic.player.height / 2 ||
+        if (firstEnemy.height !== logic.player.height / 2 || !firstEnemy.isMoving ||
             Math.abs(firstEnemy.x - playerCenterX) < minimumDistance ||
             Math.abs(firstEnemy.y + firstEnemy.height - sectionHeight) > 0.001) {
             console.error("Test failed: crab should be half player height, on a floor, and far enough from player");
@@ -1095,8 +1137,13 @@ function testEnemySpawningAndDrawing() {
         }
         firstEnemy.x = playerCenterX - 1;
         logic.updateEnemies(11009);
-        if (firstEnemy.x !== playerCenterX) {
-            console.error("Test failed: crab should stop at the player instead of overshooting");
+        if (firstEnemy.x !== playerCenterX || !firstEnemy.isMoving) {
+            console.error("Test failed: crab should move to the player without overshooting");
+            return false;
+        }
+        logic.updateEnemies(11010);
+        if (firstEnemy.isMoving) {
+            console.error("Test failed: crab should be marked stationary after reaching the player");
             return false;
         }
 
@@ -1144,6 +1191,7 @@ function runAllTests() {
         testCombatAttacksAndExplosions(),
         testVictoryAtFifteenKills(),
         testPlayerDamageImmunityAndGameOver(),
+        testCrabWalkingAndClaws(),
         testEnemySpawningAndDrawing(),
         testFindClosestFloor()
     ];
@@ -1176,6 +1224,7 @@ if (typeof module !== 'undefined' && module.exports) {
         testCombatAttacksAndExplosions,
         testVictoryAtFifteenKills,
         testPlayerDamageImmunityAndGameOver,
+        testCrabWalkingAndClaws,
         testEnemySpawningAndDrawing,
         testFindClosestFloor,
         runAllTests

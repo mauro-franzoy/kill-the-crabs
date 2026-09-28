@@ -544,7 +544,8 @@ function updateEnemies(now = getAnimationTime()) {
                         height: enemyHeight,
                         floor: 2 - floorSurfaces.indexOf(floorSurface),
                         roamDirection: null,
-                        isRoaming: false
+                        isRoaming: false,
+                        isMoving: false
                     });
                 }
             }
@@ -554,6 +555,7 @@ function updateEnemies(now = getAnimationTime()) {
     const movementSpeed = player.speed / 2;
     const playerCenterX = player.x + player.width / 2;
     for (const enemy of enemies) {
+        const previousX = enemy.x;
         const minX = enemy.width / 2;
         const maxX = canvas.width - enemy.width / 2;
         const shouldRoam = player.isClimbing || enemy.floor !== player.currentFloor;
@@ -577,6 +579,7 @@ function updateEnemies(now = getAnimationTime()) {
             enemy.x += Math.sign(distanceToPlayer) * Math.min(movementSpeed, Math.abs(distanceToPlayer));
             enemy.x = Math.max(minX, Math.min(maxX, enemy.x));
         }
+        enemy.isMoving = enemy.x !== previousX;
     }
     updateExplosionEffects(now);
     resolveEnemyCollisions(now);
@@ -745,7 +748,7 @@ function resolveEnemyCollisions(now) {
         break;
     }
 }
-function drawCrab(enemy) {
+function drawCrab(enemy, now = getAnimationTime()) {
     const centerX = enemy.x;
     const centerY = enemy.y + enemy.height * 0.52;
     const halfWidth = enemy.width / 2;
@@ -759,10 +762,12 @@ function drawCrab(enemy) {
         for (let leg = 0; leg < 3; leg++) {
             const attachX = centerX + side * enemy.width * 0.17;
             const attachY = enemy.y + height * (0.52 + leg * 0.055);
-            const jointX = centerX + side * enemy.width * (0.31 + leg * 0.015);
-            const jointY = enemy.y + height * (0.61 + leg * 0.07);
-            const footX = centerX + side * enemy.width * 0.44;
-            const footY = enemy.y + height * (0.86 + leg * 0.05);
+            const legPhase = now / 90 + leg * Math.PI / 2 + (side === 1 ? Math.PI : 0);
+            const legSwing = enemy.isMoving ? Math.sin(legPhase) * height * 0.1 : 0;
+            const jointX = centerX + side * enemy.width * (0.31 + leg * 0.015) + legSwing * 0.5;
+            const jointY = enemy.y + height * (0.61 + leg * 0.07) - Math.max(0, Math.cos(legPhase)) * height * 0.025 * (enemy.isMoving ? 1 : 0);
+            const footX = centerX + side * enemy.width * 0.44 + legSwing;
+            const footY = enemy.y + height * (0.86 + leg * 0.05) - Math.max(0, Math.cos(legPhase)) * height * 0.035 * (enemy.isMoving ? 1 : 0);
             ctx.beginPath();
             ctx.moveTo(attachX, attachY);
             ctx.lineTo(jointX, jointY);
@@ -782,11 +787,14 @@ function drawCrab(enemy) {
         ctx.arc(clawX, clawY, height * 0.1, 0, Math.PI * 2);
         ctx.stroke();
 
+        const clawOpen = (Math.sin(now / 220) + 1) / 2;
+        const clawSpread = height * (0.025 + clawOpen * 0.1);
+        const clawTipDistance = height * (0.09 + clawOpen * 0.1);
         ctx.beginPath();
-        ctx.moveTo(clawX + side * height * 0.06, clawY - height * 0.02);
-        ctx.lineTo(clawX + side * height * 0.13, clawY - height * 0.09);
-        ctx.moveTo(clawX + side * height * 0.06, clawY + height * 0.02);
-        ctx.lineTo(clawX + side * height * 0.13, clawY + height * 0.09);
+        ctx.moveTo(clawX + side * height * 0.06, clawY);
+        ctx.lineTo(clawX + side * clawTipDistance, clawY - clawSpread);
+        ctx.moveTo(clawX + side * height * 0.06, clawY);
+        ctx.lineTo(clawX + side * clawTipDistance, clawY + clawSpread);
         ctx.stroke();
     }
 
@@ -832,7 +840,7 @@ function drawCrabExplosion(explosion, now) {
 }
 function drawFloorWords(sectionHeight) {
     const previousFilter = ctx.filter || "none";
-    ctx.filter = previousFilter === "none" ? "blur(2px)" : previousFilter + " blur(2px)";
+    ctx.filter = previousFilter === "none" ? "blur(4px)" : previousFilter + " blur(4px)";
     const floorWords = [
         { text: 'kill', y: sectionHeight / 2 },
         { text: 'the', y: sectionHeight * 1.5 },
@@ -864,7 +872,7 @@ function drawGame(now = getAnimationTime()) {
     }
 
     for (const enemy of enemies) {
-        drawCrab(enemy);
+        drawCrab(enemy, now);
     }
     for (const explosion of explosionEffects) {
         drawCrabExplosion(explosion, now);
