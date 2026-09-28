@@ -70,6 +70,13 @@ function updateGameData() {
 }
 
 updateGameData();
+const gameInstructions = document.getElementById("game-instructions");
+if (gameInstructions) {
+    setTimeout(() => {
+        gameInstructions.hidden = true;
+    }, 5000);
+}
+
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
