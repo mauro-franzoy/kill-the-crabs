@@ -730,7 +730,9 @@ function testSpacebarAttackAnimations() {
     if (!upPunch || upPunch[1].y >= upPunch[0].y || Math.abs(upwardPunchLength - 160 * 0.2 * 5) > 0.001 ||
         !fistFill || fistFill.fillStyle !== 'red' || fistFill.path.length < 9 ||
         Math.abs(fistShapeLength - 0.85 * 160 * 0.15 * 3 * 1.5) > 0.001 ||
-        Math.abs(fistShapeWidth - 2 * 160 * 0.15 * 1.2 * 1.5) > 0.001 || visibleKnuckleLines !== 3 ||
+        Math.abs(fistShapeWidth - 1.95 * 160 * 0.15 * 1.2 * 1.5) > 0.001 || visibleKnuckleLines !== 5 ||
+        fistFill.path.filter(point => point.type === 'quadratic' &&
+            Math.abs(point.x * punchDirectionX + point.y * punchDirectionY - Math.max(...fistProjections)) < 0.001).length !== 4 ||
         mockCtx.fillCalls.length - upFillStart !== 1) {
         console.error('Test failed: peak upward punch should show a fist at its tip');
         teardownMockEnvironment();
@@ -830,27 +832,29 @@ function testCombatAttacksAndExplosions() {
     logic.player.attack = { type: "kick", direction: "right", frame: 6 };
     logic.updateEnemies(1000);
     if (logic.enemies.length !== 0 || logic.gameState.score !== 1 ||
-        logic.gameState.lives !== 3 || logic.explosionEffects.length !== 1 ||
+        logic.gameState.lives !== 3 || logic.crabDeathEffects.length !== 1 ||
+        logic.crabDeathEffects[0].velocityX <= 0 || logic.crabDeathEffects[0].rotation !== Math.PI ||
         mockScoreElement.textContent !== "1") {
-        console.error("Test failed: kicking a crab should remove it, score one, and start an explosion");
+        console.error("Test failed: kicking a crab should score one and launch it backward");
         teardownMockEnvironment();
         return false;
     }
     logic.drawGame(1000);
-    if (!mockCtx.fillCalls.some(call => call.fillStyle === "yellow") || mockCtx.globalAlpha !== 1) {
-        console.error("Test failed: crab explosion should draw an animated burst and restore canvas alpha");
+    if (mockCtx.strokeCalls.length === 0 || mockCtx.globalAlpha !== 1) {
+        console.error("Test failed: flipped crab should draw and restore canvas alpha");
         teardownMockEnvironment();
         return false;
     }
-    logic.updateEnemies(1299);
-    if (logic.explosionEffects.length !== 1) {
-        console.error("Test failed: crab explosion should remain visible during its short animation");
+    const deathEffectEndTime = logic.crabDeathEffects[0].startTime + 1000;
+    logic.updateEnemies(deathEffectEndTime - 1);
+    if (logic.crabDeathEffects.length !== 1) {
+        console.error("Test failed: flipped crab should remain visible during its short animation");
         teardownMockEnvironment();
         return false;
     }
-    logic.updateEnemies(1300);
-    if (logic.explosionEffects.length !== 0) {
-        console.error("Test failed: crab explosion should be removed when its animation ends");
+    logic.updateEnemies(deathEffectEndTime);
+    if (logic.crabDeathEffects.length !== 0) {
+        console.error("Test failed: flipped crab should be removed when its animation ends");
         teardownMockEnvironment();
         return false;
     }
