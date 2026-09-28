@@ -775,35 +775,35 @@ function testSpacebarAttackAnimations() {
 
     logic.keys.Space = false;
     logic.player.attack = { type: 'kick', direction: 'left', frame: 6, peakTime: 1000 };
-    logic.updatePlayer(1499);
+    logic.updatePlayer(1799);
     if (logic.player.attack.frame !== 6) {
-        console.error('Test failed: attack pose should hold through the half-second display');
+        console.error('Test failed: attack pose should hold through the 800 ms display');
         teardownMockEnvironment();
         return false;
     }
-    logic.updatePlayer(1501);
+    logic.updatePlayer(1801);
     if (logic.player.attack.frame !== 7) {
-        console.error('Test failed: attack pose should retract after half a second');
+        console.error('Test failed: attack pose should retract after 800 ms');
         teardownMockEnvironment();
         return false;
     }
 
     const timedKick = { type: 'kick', direction: 'left', frame: 6, peakTime: 1000 };
     const timedKickFillStart = mockCtx.fillCalls.length;
-    logic.drawStickman(100, 200, 160, 'left', 0, false, timedKick, 1499);
-    logic.drawStickman(100, 200, 160, 'left', 0, false, timedKick, 1501);
+    logic.drawStickman(100, 200, 160, 'left', 0, false, timedKick, 1799);
+    logic.drawStickman(100, 200, 160, 'left', 0, false, timedKick, 1801);
     if (mockCtx.fillCalls.length - timedKickFillStart !== 6) {
-        console.error('Test failed: filled foot and toes should stay visible for half a second');
+        console.error('Test failed: filled foot and toes should stay visible for 800 ms');
         teardownMockEnvironment();
         return false;
     }
 
     const timedPunch = { type: 'punch', direction: 'up', frame: 6, peakTime: 1000 };
     const timedPunchFillStart = mockCtx.fillCalls.length;
-    logic.drawStickman(100, 200, 160, 'left', 0, true, timedPunch, 1499);
-    logic.drawStickman(100, 200, 160, 'left', 0, true, timedPunch, 1501);
+    logic.drawStickman(100, 200, 160, 'left', 0, true, timedPunch, 1799);
+    logic.drawStickman(100, 200, 160, 'left', 0, true, timedPunch, 1801);
     if (mockCtx.fillCalls.length - timedPunchFillStart !== 1) {
-        console.error('Test failed: filled fist should stay visible for half a second');
+        console.error('Test failed: filled fist should stay visible for 800 ms');
         teardownMockEnvironment();
         return false;
     }
