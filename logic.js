@@ -56,6 +56,8 @@ const ENEMY_MAX_SPAWN_INTERVAL_MS = 5000;
 const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
 const BRICK_WALL_BUILD_DURATION_MS = 900;
 const CRAB_NET_CAPTURE_DURATION_MS = 500;
+const CRAB_COOKING_SCENE_MS = 800;
+const CRAB_TABLE_SCENE_MS = 800;
 const BRICK_WALL_THICKNESS = 18;
 let nextEnemySpawnTime = null;
 let pausedDurationMs = 0;
@@ -972,19 +974,7 @@ function resolveEnemyCollisions(now) {
         break;
     }
 
-    if (brickWallEncounter && attackShape && player.attack !== brickWallEncounter.openingAttack &&
-        attackTouchesEnemy(attackShape, getEnemyRectangle(brickWallEncounter.crab))) {
-        const capturedCrab = brickWallEncounter.crab;
-        brickWallEncounter = null;
-        addCrabDeathEffect(capturedCrab, now);
-        gameState.score += 1;
-        player.laughUntil = now + LAUGH_DURATION_MS;
-        updateGameData();
-        if (gameState.score >= 15) {
-            gameState.won = true;
-            gameState.gameOver = true;
-        }
-    }
+
 }
 
 function beginBrickWallEncounter(enemy, now) {
@@ -1007,6 +997,7 @@ function beginBrickWallEncounter(enemy, now) {
         captureTime: now,
         openingAttack: player.attack
     };
+    player.isMoving = false;
     for (const other of enemies) {
         if (other.floor !== enemy.floor) continue;
         const midpoint = (left + right) / 2;
@@ -1165,24 +1156,27 @@ function drawBrickWallEncounter(encounter, now) {
     }
 }
 
-function drawButterflyNet(encounter) {
+function drawButterflyNet(encounter, playerHeight) {
     const crab = encounter.crab;
+    const crabScale = 0.55;
+    const crabWidth = crab.width * crabScale;
+    const crabHeight = crab.height * crabScale;
     const netCenterX = crab.x;
-    const netCenterY = crab.y + crab.height * 0.43;
-    const handleX = player.x + (player.direction === 'left' ? -1 : 1) * player.height * 0.18;
-    const handleY = player.y + player.height * 0.48;
-    const rimWidth = crab.width * 0.68;
-    const rimHeight = crab.height * 0.58;
+    const netCenterY = encounter.floorY - crabHeight * 0.52;
+    const handleX = player.x + (player.direction === 'left' ? -1 : 1) * playerHeight * 0.18;
+    const handleY = encounter.floorY - playerHeight * 0.45;
+    const rimWidth = crabWidth * 1.22;
+    const rimHeight = crabHeight * 1.12;
 
     ctx.strokeStyle = '#6b4b2a';
-    ctx.lineWidth = Math.max(4, player.height * 0.025);
+    ctx.lineWidth = Math.max(4, playerHeight * 0.025);
     ctx.beginPath();
     ctx.moveTo(handleX, handleY);
     ctx.lineTo(netCenterX, netCenterY);
     ctx.stroke();
 
     ctx.strokeStyle = '#d8e8e8';
-    ctx.lineWidth = Math.max(3, player.height * 0.018);
+    ctx.lineWidth = Math.max(3, playerHeight * 0.018);
     ctx.beginPath();
     ctx.ellipse(netCenterX, netCenterY, rimWidth / 2, rimHeight / 2, 0, 0, Math.PI * 2);
     ctx.stroke();
@@ -1194,88 +1188,99 @@ function drawButterflyNet(encounter) {
     }
 }
 
-function drawCrabCookingPot(encounter, now) {
+function drawCrabCookingPot(encounter, now, chefHeight) {
     const crab = encounter.crab;
     const centerX = crab.x;
     const floorY = encounter.floorY;
-    const stoveWidth = crab.width * 1.5;
-    const stoveHeight = crab.height * 0.48;
+    const stoveHeight = chefHeight * 0.5;
+    const stoveWidth = chefHeight * 0.95;
     const stoveTop = floorY - stoveHeight;
-    const potWidth = crab.width * 0.92;
-    const potHeight = crab.height * 0.76;
-    const potTop = stoveTop - potHeight * 0.72;
+    const potWidth = chefHeight * 0.66;
+    const potHeight = chefHeight * 0.62;
+    const potTop = stoveTop - potHeight * 0.78;
     const rimY = potTop + potHeight * 0.16;
 
-    ctx.fillStyle = '#4a4a4a';
-    ctx.strokeStyle = '#b8b8b8';
+    // Compact freestanding stove, half the chef's rendered height.
+    ctx.fillStyle = '#555555';
+    ctx.strokeStyle = '#d0d0d0';
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(centerX - stoveWidth / 2, stoveTop + 8);
     ctx.lineTo(centerX + stoveWidth / 2, stoveTop + 8);
-    ctx.lineTo(centerX + stoveWidth * 0.43, floorY - 5);
-    ctx.lineTo(centerX - stoveWidth * 0.43, floorY - 5);
+    ctx.lineTo(centerX + stoveWidth * 0.42, floorY - 4);
+    ctx.lineTo(centerX - stoveWidth * 0.42, floorY - 4);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#202020';
+    ctx.fillStyle = '#242424';
     ctx.beginPath();
-    ctx.ellipse(centerX, stoveTop + 5, stoveWidth * 0.38, crab.height * 0.08, 0, 0, Math.PI * 2);
+    ctx.ellipse(centerX, stoveTop + 5, stoveWidth * 0.4, chefHeight * 0.035, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-
-    const steamPhase = now / 180;
-    ctx.strokeStyle = '#e5e5e5';
-    ctx.lineWidth = Math.max(3, crab.height * 0.035);
-    for (let index = -1; index <= 1; index++) {
-        const steamX = centerX + index * potWidth * 0.23;
-        const sway = Math.sin(steamPhase + index) * crab.width * 0.08;
+    for (const side of [-1, 1]) {
         ctx.beginPath();
-        ctx.moveTo(steamX, potTop - crab.height * 0.04);
-        ctx.quadraticCurveTo(steamX - sway, potTop - crab.height * 0.25,
-            steamX + sway, potTop - crab.height * 0.42);
-        ctx.quadraticCurveTo(steamX + sway * 1.5, potTop - crab.height * 0.58,
-            steamX - sway * 0.4, potTop - crab.height * 0.72);
+        ctx.arc(centerX + side * stoveWidth * 0.25, stoveTop + stoveHeight * 0.55,
+            chefHeight * 0.035, 0, Math.PI * 2);
+        ctx.fillStyle = '#dddddd';
+        ctx.fill();
         ctx.stroke();
     }
 
-    ctx.fillStyle = '#777777';
-    ctx.strokeStyle = '#d2d2d2';
+    // Moving steam remains visible above the pot.
+    const steamPhase = now / 180;
+    ctx.strokeStyle = '#eeeeee';
+    ctx.lineWidth = Math.max(3, chefHeight * 0.025);
+    for (let index = -1; index <= 1; index++) {
+        const steamX = centerX + index * potWidth * 0.24;
+        const sway = Math.sin(steamPhase + index) * potWidth * 0.12;
+        ctx.beginPath();
+        ctx.moveTo(steamX, potTop - chefHeight * 0.025);
+        ctx.quadraticCurveTo(steamX - sway, potTop - chefHeight * 0.2,
+            steamX + sway, potTop - chefHeight * 0.36);
+        ctx.quadraticCurveTo(steamX + sway * 1.5, potTop - chefHeight * 0.5,
+            steamX - sway * 0.4, potTop - chefHeight * 0.62);
+        ctx.stroke();
+    }
+
+    // Tall cylindrical pot sitting on the stove.
+    ctx.fillStyle = '#858585';
+    ctx.strokeStyle = '#e0e0e0';
     ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.moveTo(centerX - potWidth / 2, potTop + potHeight * 0.12);
-    ctx.quadraticCurveTo(centerX - potWidth * 0.46, potTop + potHeight * 0.72,
-        centerX - potWidth * 0.32, potTop + potHeight);
-    ctx.lineTo(centerX + potWidth * 0.32, potTop + potHeight);
-    ctx.quadraticCurveTo(centerX + potWidth * 0.46, potTop + potHeight * 0.72,
-        centerX + potWidth / 2, potTop + potHeight * 0.12);
+    ctx.lineTo(centerX - potWidth * 0.44, potTop + potHeight * 0.88);
+    ctx.quadraticCurveTo(centerX, potTop + potHeight * 1.02,
+        centerX + potWidth * 0.44, potTop + potHeight * 0.88);
+    ctx.lineTo(centerX + potWidth / 2, potTop + potHeight * 0.12);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
     ctx.beginPath();
-    ctx.ellipse(centerX, rimY, potWidth / 2, crab.height * 0.09, 0, 0, Math.PI * 2);
+    ctx.ellipse(centerX, rimY, potWidth / 2, chefHeight * 0.035, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#333333';
     ctx.fill();
     ctx.stroke();
 
+    // The crab is hidden in the pot except for its cooked red claws.
     for (const side of [-1, 1]) {
         const clawX = centerX + side * potWidth * 0.34;
-        const clawY = rimY - crab.height * 0.05;
-        ctx.strokeStyle = '#565656';
-        ctx.lineWidth = Math.max(4, crab.height * 0.04);
+        const clawY = rimY - chefHeight * 0.04;
+        ctx.strokeStyle = '#d52b2b';
+        ctx.fillStyle = '#e33434';
+        ctx.lineWidth = Math.max(4, chefHeight * 0.035);
         ctx.beginPath();
-        ctx.moveTo(centerX + side * potWidth * 0.2, rimY + crab.height * 0.08);
+        ctx.moveTo(centerX + side * potWidth * 0.18, rimY + chefHeight * 0.06);
         ctx.lineTo(clawX, clawY);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(clawX, clawY, crab.height * 0.09, 0, Math.PI * 2);
-        ctx.fillStyle = '#555555';
+        ctx.arc(clawX, clawY, chefHeight * 0.065, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(clawX + side * crab.height * 0.04, clawY - crab.height * 0.04);
-        ctx.lineTo(clawX + side * crab.height * 0.14, clawY - crab.height * 0.1);
-        ctx.moveTo(clawX + side * crab.height * 0.04, clawY + crab.height * 0.04);
-        ctx.lineTo(clawX + side * crab.height * 0.14, clawY + crab.height * 0.1);
+        ctx.moveTo(clawX + side * chefHeight * 0.03, clawY - chefHeight * 0.03);
+        ctx.lineTo(clawX + side * chefHeight * 0.11, clawY - chefHeight * 0.075);
+        ctx.moveTo(clawX + side * chefHeight * 0.03, clawY + chefHeight * 0.03);
+        ctx.lineTo(clawX + side * chefHeight * 0.11, clawY + chefHeight * 0.075);
         ctx.stroke();
     }
 }
@@ -1284,7 +1289,7 @@ function drawChefHat(x, y, height) {
     const headRadius = height * 0.15;
     const headY = y + headRadius;
     const hatWidth = headRadius * 2.5;
-    const hatHeight = headRadius * 1.15;
+    const hatHeight = headRadius * 1.7;
     const hatBottom = headY - headRadius * 0.72;
 
     ctx.fillStyle = '#f5f5f5';
@@ -1305,6 +1310,156 @@ function drawChefHat(x, y, height) {
     ctx.stroke();
     ctx.fillRect(x - hatWidth / 2, hatBottom, hatWidth, headRadius * 0.24);
     ctx.strokeRect?.(x - hatWidth / 2, hatBottom, hatWidth, headRadius * 0.24);
+}
+
+function drawChefApron(x, y, height) {
+    const headRadius = height * 0.15;
+    const bodyTop = y + headRadius * 2.3;
+    const bodyBottom = bodyTop + height * 0.34;
+    const apronWidth = height * 0.21;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#d8d8d8';
+    ctx.lineWidth = Math.max(2, height * 0.012);
+    ctx.beginPath();
+    ctx.moveTo(x - apronWidth * 0.34, bodyTop);
+    ctx.lineTo(x + apronWidth * 0.34, bodyTop);
+    ctx.lineTo(x + apronWidth * 0.55, bodyBottom);
+    ctx.lineTo(x - apronWidth * 0.55, bodyBottom);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - apronWidth * 0.34, bodyTop + height * 0.02);
+    ctx.lineTo(x - apronWidth * 0.26, bodyTop - height * 0.025);
+    ctx.moveTo(x + apronWidth * 0.34, bodyTop + height * 0.02);
+    ctx.lineTo(x + apronWidth * 0.26, bodyTop - height * 0.025);
+    ctx.stroke();
+}
+
+function drawCookedCrab(x, y, size) {
+    ctx.fillStyle = '#df3434';
+    ctx.strokeStyle = '#9c1f1f';
+    ctx.lineWidth = Math.max(2, size * 0.035);
+    ctx.beginPath();
+    ctx.ellipse(x, y, size * 0.3, size * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    for (const side of [-1, 1]) {
+        for (let leg = 0; leg < 3; leg++) {
+            const startY = y - size * 0.02 + leg * size * 0.055;
+            ctx.beginPath();
+            ctx.moveTo(x + side * size * 0.2, startY);
+            ctx.lineTo(x + side * size * 0.42, startY + (leg - 1) * size * 0.12);
+            ctx.stroke();
+        }
+        const clawX = x + side * size * 0.36;
+        const clawY = y - size * 0.19;
+        ctx.beginPath();
+        ctx.moveTo(x + side * size * 0.18, y - size * 0.1);
+        ctx.lineTo(clawX, clawY);
+        ctx.arc(clawX + side * size * 0.055, clawY, size * 0.09, Math.PI, Math.PI * 2);
+        ctx.stroke();
+    }
+}
+
+function drawTableScene(encounter, now) {
+    const sceneHeight = Math.min(player.height * 0.62, (encounter.floorY - encounter.top) * 0.72);
+    const innerLeft = encounter.left + BRICK_WALL_THICKNESS + sceneHeight * 0.1;
+    const innerRight = encounter.right - BRICK_WALL_THICKNESS - sceneHeight * 0.1;
+    const roomWidth = Math.max(sceneHeight, innerRight - innerLeft);
+    const playerX = player.x;
+    const playerY = encounter.floorY - sceneHeight;
+    const tableY = encounter.floorY - sceneHeight * 0.43;
+    const tableLeft = Math.max(innerLeft, (innerLeft + innerRight - roomWidth * 0.9) / 2);
+    const tableWidth = Math.min(roomWidth * 0.9, innerRight - innerLeft);
+
+    // Keep the chair, chef, table, and plate at the captured encounter location.
+    ctx.fillStyle = '#70452b';
+    ctx.fillRect(playerX - sceneHeight * 0.23, playerY + sceneHeight * 0.38,
+        sceneHeight * 0.46, sceneHeight * 0.62);
+    ctx.fillStyle = '#95613b';
+    ctx.fillRect(playerX - sceneHeight * 0.3, tableY - sceneHeight * 0.08,
+        sceneHeight * 0.6, sceneHeight * 0.12);
+    drawStickman(playerX, playerY, sceneHeight, 'right', 0, false, null, now, 'red');
+    drawChefApron(playerX, playerY, sceneHeight);
+    drawChefHat(playerX, playerY, sceneHeight);
+
+    // The tabletop masks the chef's legs to create a seated pose.
+    ctx.fillStyle = '#7c4828';
+    ctx.fillRect(tableLeft, tableY, tableWidth, sceneHeight * 0.12);
+    ctx.fillStyle = '#59351f';
+    ctx.fillRect(tableLeft + tableWidth * 0.05, tableY + sceneHeight * 0.12,
+        tableWidth * 0.9, sceneHeight * 0.32);
+    ctx.fillRect(tableLeft + tableWidth * 0.08, tableY + sceneHeight * 0.44,
+        sceneHeight * 0.07, encounter.floorY - tableY - sceneHeight * 0.44);
+    ctx.fillRect(tableLeft + tableWidth * 0.85, tableY + sceneHeight * 0.44,
+        sceneHeight * 0.07, encounter.floorY - tableY - sceneHeight * 0.44);
+
+    const plateX = Math.max(tableLeft + sceneHeight * 0.48,
+        Math.min(tableLeft + tableWidth - sceneHeight * 0.48, playerX + sceneHeight * 0.52));
+    const plateY = tableY - sceneHeight * 0.025;
+    ctx.fillStyle = '#f8f5ed';
+    ctx.strokeStyle = '#a8a8a8';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(plateX, plateY, sceneHeight * 0.42, sceneHeight * 0.13, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(plateX, plateY - sceneHeight * 0.025, sceneHeight * 0.3, sceneHeight * 0.08, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    drawCookedCrab(plateX, plateY - sceneHeight * 0.2, sceneHeight * 0.8);
+    drawDiningUtensils(playerX, tableY, plateX, sceneHeight);
+}
+
+function drawDiningUtensils(playerX, tableY, plateX, size) {
+    const forkHandX = playerX + size * 0.12;
+    const knifeHandX = playerX + size * 0.18;
+    const handsY = tableY + size * 0.035;
+    const forkTipX = plateX - size * 0.2;
+    const knifeTipX = plateX + size * 0.2;
+    const utensilY = tableY - size * 0.12;
+
+    // Red stick-figure arms reach over the table to hold both utensils.
+    ctx.strokeStyle = '#d32f2f';
+    ctx.lineWidth = Math.max(4, size * 0.035);
+    ctx.beginPath();
+    ctx.moveTo(playerX - size * 0.04, tableY - size * 0.15);
+    ctx.lineTo(forkHandX, handsY);
+    ctx.moveTo(playerX + size * 0.04, tableY - size * 0.15);
+    ctx.lineTo(knifeHandX, handsY + size * 0.035);
+    ctx.stroke();
+    ctx.fillStyle = '#d32f2f';
+    for (const handX of [forkHandX, knifeHandX]) {
+        ctx.beginPath();
+        ctx.arc(handX, handsY, size * 0.035, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Fork and knife angle from the chef's hands toward the plate.
+    ctx.strokeStyle = '#dedede';
+    ctx.lineWidth = Math.max(2, size * 0.018);
+    ctx.beginPath();
+    ctx.moveTo(forkHandX, handsY);
+    ctx.lineTo(forkTipX, utensilY);
+    ctx.moveTo(forkTipX - size * 0.025, utensilY - size * 0.055);
+    ctx.lineTo(forkTipX, utensilY);
+    ctx.lineTo(forkTipX + size * 0.025, utensilY - size * 0.055);
+    ctx.moveTo(forkTipX, utensilY);
+    ctx.lineTo(forkTipX, utensilY - size * 0.065);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(knifeHandX, handsY + size * 0.035);
+    ctx.lineTo(knifeTipX, utensilY + size * 0.015);
+    ctx.stroke();
+    ctx.fillStyle = '#eeeeee';
+    ctx.beginPath();
+    ctx.moveTo(knifeTipX - size * 0.015, utensilY + size * 0.025);
+    ctx.lineTo(knifeTipX + size * 0.06, utensilY - size * 0.045);
+    ctx.lineTo(knifeTipX + size * 0.025, utensilY + size * 0.055);
+    ctx.closePath();
+    ctx.fill();
 }
 
 function drawFloorWords(sectionHeight) {
@@ -1348,25 +1503,40 @@ function drawGame(now = getGameTime()) {
     }
     if (brickWallEncounter) {
         drawBrickWallEncounter(brickWallEncounter, now);
-        if (now - brickWallEncounter.captureTime < CRAB_NET_CAPTURE_DURATION_MS) {
-            drawCrab({ ...brickWallEncounter.crab, isMoving: false }, now);
-        } else {
-            drawCrabCookingPot(brickWallEncounter, now);
+        const chefHeight = player.height * 0.62;
+        const captureElapsed = now - brickWallEncounter.captureTime;
+        if (captureElapsed < CRAB_NET_CAPTURE_DURATION_MS) {
+            const capturedCrab = brickWallEncounter.crab;
+            const crabScale = 0.55;
+            drawCrab({ ...capturedCrab, width: capturedCrab.width * crabScale,
+                height: capturedCrab.height * crabScale,
+                y: brickWallEncounter.floorY - capturedCrab.height * crabScale,
+                isMoving: false }, now);
+        } else if (captureElapsed < CRAB_NET_CAPTURE_DURATION_MS + CRAB_COOKING_SCENE_MS) {
+            drawCrabCookingPot(brickWallEncounter, now, chefHeight);
         }
     }
     
     const immunityAge = PLAYER_IMMUNITY_MS - (gameState.immuneUntil - now);
     const blinkPhase = Math.floor(immunityAge / 250) % 4;
-    if (now >= gameState.immuneUntil || blinkPhase % 2 === 0) {
+    const captureElapsed = brickWallEncounter ? now - brickWallEncounter.captureTime : -1;
+    const diningScene = brickWallEncounter &&
+        captureElapsed >= CRAB_NET_CAPTURE_DURATION_MS + CRAB_COOKING_SCENE_MS;
+    if (diningScene) {
+        drawTableScene(brickWallEncounter, now);
+    } else if (brickWallEncounter || now >= gameState.immuneUntil || blinkPhase % 2 === 0) {
         const playerColor = now < gameState.immuneUntil && blinkPhase === 2 ? 'magenta' : 'red';
-        drawStickman(player.x, player.y, player.height, player.direction, player.animationFrame, player.isClimbing, player.attack, now, playerColor);
-    }
-    if (brickWallEncounter) {
-        if (now - brickWallEncounter.captureTime < CRAB_NET_CAPTURE_DURATION_MS) {
-            drawButterflyNet(brickWallEncounter);
-        } else {
-            drawChefHat(player.x, player.y, player.height);
+        const chefHeight = brickWallEncounter ? player.height * 0.62 : player.height;
+        const chefY = brickWallEncounter ? brickWallEncounter.floorY - chefHeight : player.y;
+        drawStickman(player.x, chefY, chefHeight, player.direction, player.animationFrame,
+            false, brickWallEncounter ? null : player.attack, now, playerColor);
+        if (brickWallEncounter) {
+            drawChefApron(player.x, chefY, chefHeight);
+            drawChefHat(player.x, chefY, chefHeight);
         }
+    }
+    if (brickWallEncounter && captureElapsed >= 0 && captureElapsed < CRAB_NET_CAPTURE_DURATION_MS) {
+        drawButterflyNet(brickWallEncounter, player.height * 0.62);
     }
     if (gameState.paused) {
         ctx.filter = "none";
@@ -1390,16 +1560,42 @@ function drawGame(now = getGameTime()) {
     ctx.filter = "none";
 }
 
+function updateCrabCookingAnimation(now) {
+    if (!brickWallEncounter) return;
+    const elapsed = now - brickWallEncounter.captureTime;
+    const completeAt = CRAB_NET_CAPTURE_DURATION_MS + CRAB_COOKING_SCENE_MS + CRAB_TABLE_SCENE_MS;
+    if (elapsed < completeAt) return;
+
+    brickWallEncounter = null;
+    player.attack = null;
+    player.isMoving = false;
+    spacePressedPending = false;
+    spacePressedWithShift = false;
+    gameState.score += 1;
+    updateGameData();
+    if (gameState.score >= 15) {
+        gameState.won = true;
+        gameState.gameOver = true;
+    }
+}
+
 function gameLoop(timestamp) {
     const wallNow = typeof timestamp === "number" ? timestamp : getAnimationTime();
-    const now = wallNow - pausedDurationMs;
+    const now = gameState.paused && pausedAtWallTime !== null
+        ? pausedAtWallTime - pausedDurationMs
+        : wallNow - pausedDurationMs;
     if (!gameState.gameOver && !gameState.paused && wallNow - lastKeyboardInputTime >= IDLE_PAUSE_TIMEOUT_MS) {
         gameState.paused = true;
         pausedAtWallTime = wallNow;
     }
     if (!gameState.gameOver && !gameState.paused) {
-        updatePlayer(now);
-        updateEnemies(now);
+        if (brickWallEncounter) {
+            updateCrabCookingAnimation(now);
+        } else {
+            updatePlayer(now);
+            updateEnemies(now);
+            updateCrabCookingAnimation(now);
+        }
     } else if (!gameState.paused && crabDeathEffects.length > 0) {
         updateCrabDeathEffects(now);
     }
@@ -1410,7 +1606,34 @@ function gameLoop(timestamp) {
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('keydown', (e) => {
-        const key = e.code === 'Space' || e.key === ' ' ? 'Space' : ((e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key === 'Shift') ? 'Shift' : e.key);
+        const key = e.code === 'Space' || e.key === ' ' ? 'Space' :
+            ((e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key === 'Shift') ? 'Shift' :
+                ((e.key || '').toLowerCase() === 'p' ? 'Pause' : e.key));
+        if (key === 'Pause') {
+            if (!e.repeat && !gameState.gameOver) {
+                const wallNow = getAnimationTime();
+                if (gameState.paused) {
+                    pausedDurationMs += wallNow - pausedAtWallTime;
+                    pausedAtWallTime = null;
+                    gameState.paused = false;
+                    lastKeyboardInputTime = wallNow;
+                    for (const pressedKey of Object.keys(keys)) keys[pressedKey] = false;
+                    spaceWasDown = false;
+                    spacePressedPending = false;
+                    spacePressedWithShift = false;
+                    if (typeof requestAnimationFrame !== "undefined") requestAnimationFrame(gameLoop);
+                } else {
+                    gameState.paused = true;
+                    pausedAtWallTime = wallNow;
+                    for (const pressedKey of Object.keys(keys)) keys[pressedKey] = false;
+                    spaceWasDown = false;
+                    spacePressedPending = false;
+                    spacePressedWithShift = false;
+                }
+            }
+            if (e.preventDefault) e.preventDefault();
+            return;
+        }
         if (keys.hasOwnProperty(key)) {
             if (gameState.paused) {
                 if (key === "Space" && !gameState.gameOver) {
