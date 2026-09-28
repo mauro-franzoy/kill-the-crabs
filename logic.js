@@ -13,6 +13,7 @@ const player = {
     isClimbing: false,
     lastClimbDirection: null,
     attack: null,
+    laughUntil: 0,
     currentFloor: 2
 };
 
@@ -28,6 +29,7 @@ let spaceWasDown = false;
 const ATTACK_DURATION = 12;
 const ATTACK_PEAK_FRAME = 6;
 const EXTREMITY_HOLD_MS = 500;
+const LAUGH_DURATION_MS = 1200;
 
 function getAnimationTime() {
     return (typeof performance !== 'undefined' && typeof performance.now === 'function')
@@ -165,9 +167,25 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
     const bodyTopY = headY + headRadius;
     const bodyBottomY = bodyTopY + bodyLength;
     
-    ctx.beginPath();
-    ctx.arc(centerX, headY, headRadius, 0, Math.PI * 2);
-    ctx.stroke();
+    const isLaughing = player.laughUntil > now;
+    if (isLaughing) {
+        const facingSign = direction === "left" ? -1 : 1;
+        const laughElapsed = now - (player.laughUntil - LAUGH_DURATION_MS);
+        const laughPulse = (Math.sin(laughElapsed / 65) + 1) / 2;
+        const headTilt = facingSign * (0.35 + laughPulse * 0.08);
+        const headCenterX = centerX - facingSign * headRadius * 0.18;
+        ctx.beginPath();
+        ctx.ellipse(headCenterX, headY, headRadius * 0.9, headRadius, headTilt, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.ellipse(headCenterX + facingSign * headRadius * 0.22, headY + headRadius * 0.23,
+            headRadius * 0.27, headRadius * (0.13 + laughPulse * 0.08), headTilt, 0, Math.PI * 2);
+        ctx.stroke();
+    } else {
+        ctx.beginPath();
+        ctx.arc(centerX, headY, headRadius, 0, Math.PI * 2);
+        ctx.stroke();
+    }
     
     ctx.beginPath();
     ctx.moveTo(centerX, bodyTopY);
@@ -738,6 +756,7 @@ function resolveEnemyCollisions(now) {
                 startTime: now
             });
             gameState.score += 1;
+            player.laughUntil = now + LAUGH_DURATION_MS;
             updateGameData();
             if (gameState.score >= 15) {
                 gameState.won = true;
@@ -913,7 +932,7 @@ function gameLoop(timestamp) {
         updateEnemies(now);
     }
     drawGame(now);
-    if (!gameState.gameOver && typeof requestAnimationFrame !== "undefined") {
+    if ((!gameState.gameOver || player.laughUntil > now) && typeof requestAnimationFrame !== "undefined") {
         requestAnimationFrame(gameLoop);
     }
 }
