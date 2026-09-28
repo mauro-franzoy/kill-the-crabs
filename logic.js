@@ -22,7 +22,8 @@ const keys = {
     ArrowRight: false,
     ArrowUp: false,
     ArrowDown: false,
-    Space: false
+    Space: false,
+    Shift: false
 };
 
 let spaceWasDown = false;
@@ -42,6 +43,7 @@ function getAnimationTime() {
 const ladders = [];
 const enemies = [];
 const crabDeathEffects = [];
+let brickWallEncounter = null;
 const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false, won: false, paused: false };
 const PLAYER_IMMUNITY_MS = 8000;
 const CRAB_DEATH_DURATION_MS = 1000;
@@ -50,6 +52,8 @@ const CRAB_DEATH_GRAVITY = 650;
 const ENEMY_MIN_SPAWN_INTERVAL_MS = 2000;
 const ENEMY_MAX_SPAWN_INTERVAL_MS = 5000;
 const ENEMY_CLEARANCE_LADDER_WIDTHS = 4;
+const BRICK_WALL_BUILD_DURATION_MS = 900;
+const BRICK_WALL_THICKNESS = 18;
 let nextEnemySpawnTime = null;
 let pausedDurationMs = 0;
 let pausedAtWallTime = null;
@@ -579,8 +583,8 @@ function updatePlayer(now = getGameTime()) {
             : (keys.ArrowDown ? "down" : (keys.ArrowLeft ? "left" : (keys.ArrowRight ? "right" : null)));
         if (attackDirection) {
             player.attack = attackDirection === "up"
-                ? { type: "punch", direction: attackDirection, frame: 0, peakTime: null }
-                : { type: "kick", direction: attackDirection, frame: 0, peakTime: null };
+                ? { type: "punch", direction: attackDirection, frame: 0, peakTime: null, brickWall: keys.Shift }
+                : { type: "kick", direction: attackDirection, frame: 0, peakTime: null, brickWall: keys.Shift };
         } else {
             const attackLadder = isOverLadder(player.x, player.y);
             const insideLadder = attackLadder && (
@@ -618,6 +622,14 @@ function updatePlayer(now = getGameTime()) {
     }
     
     player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+    if (brickWallEncounter) {
+        const halfWidth = Math.max(player.width / 2, player.height * 0.15);
+        player.x = Math.max(brickWallEncounter.left + BRICK_WALL_THICKNESS + halfWidth,
+            Math.min(brickWallEncounter.right - BRICK_WALL_THICKNESS - halfWidth, player.x));
+        player.isClimbing = false;
+        player.currentFloor = brickWallEncounter.floor;
+        player.y = brickWallEncounter.floorY - player.height;
+    }
 }
 
 function findClosestFloor(playerY, floorY) {
@@ -652,10 +664,16 @@ function updateEnemies(now = getGameTime()) {
             const playerCenterX = player.x + player.width / 2;
             const ladderWidth = ladders.length > 0 ? ladders[0].width : 40;
             const clearance = ladderWidth * ENEMY_CLEARANCE_LADDER_WIDTHS;
-            const validRanges = [
+            let validRanges = [
                 [minX, Math.min(maxX, playerCenterX - clearance)],
                 [Math.max(minX, playerCenterX + clearance), maxX]
             ].filter(([rangeStart, rangeEnd]) => rangeEnd >= rangeStart);
+            if (brickWallEncounter) {
+                validRanges = [
+                    [minX, Math.min(maxX, brickWallEncounter.left - enemyWidth / 2)],
+                    [Math.max(minX, brickWallEncounter.right + enemyWidth / 2), maxX]
+                ].filter(([rangeStart, rangeEnd]) => rangeEnd >= rangeStart);
+            }
             const totalRange = validRanges.reduce((sum, [rangeStart, rangeEnd]) => sum + rangeEnd - rangeStart, 0);
             if (totalRange > 0) {
                 for (let spawnIndex = 0; spawnIndex < spawnCount; spawnIndex++) {
@@ -694,6 +712,38 @@ function updateEnemies(now = getGameTime()) {
         const previousX = enemy.x;
         const minX = enemy.width / 2;
         const maxX = canvas.width - enemy.width / 2;
+        if (brickWallEncounter && enemy.floor === brickWallEncounter.floor) {
+            const midpoint = (brickWallEncounter.left + brickWallEncounter.right) / 2;
+            if (!enemy.arenaSide) enemy.arenaSide = enemy.x <= midpoint ? -1 : 1;
+            const boundary = enemy.arenaSide < 0
+                ? Math.max(minX, brickWallEncounter.left - enemy.width / 2)
+                : Math.min(maxX, brickWallEncounter.right + enemy.width / 2);
+            if (enemy.arenaSide < 0) {
+                enemy.x = Math.min(enemy.x, boundary);
+                if (enemy.roamDirection === null || enemy.roamDirection === undefined) enemy.roamDirection = -1;
+                enemy.x += enemy.roamDirection * movementSpeed;
+                if (enemy.x <= minX) {
+                    enemy.x = minX;
+                    enemy.roamDirection = 1;
+                } else if (enemy.x >= boundary) {
+                    enemy.x = boundary;
+                    enemy.roamDirection = -1;
+                }
+            } else {
+                enemy.x = Math.max(enemy.x, boundary);
+                if (enemy.roamDirection === null || enemy.roamDirection === undefined) enemy.roamDirection = 1;
+                enemy.x += enemy.roamDirection * movementSpeed;
+                if (enemy.x >= maxX) {
+                    enemy.x = maxX;
+                    enemy.roamDirection = -1;
+                } else if (enemy.x <= boundary) {
+                    enemy.x = boundary;
+                    enemy.roamDirection = 1;
+                }
+            }
+            enemy.isMoving = enemy.x !== previousX;
+            continue;
+        }
         const shouldRoam = player.isClimbing || enemy.floor !== player.currentFloor;
 
         if (shouldRoam) {
@@ -875,6 +925,11 @@ function resolveEnemyCollisions(now) {
         const enemy = enemies[index];
         const enemyRectangle = getEnemyRectangle(enemy);
         if (attackShape && attackTouchesEnemy(attackShape, enemyRectangle)) {
+            if (!brickWallEncounter && player.attack.brickWall && enemy.floor === player.currentFloor) {
+                enemies.splice(index, 1);
+                beginBrickWallEncounter(enemy, now);
+                continue;
+            }
             enemies.splice(index, 1);
             const hitDirection = getAttackTravelDirection();
             crabDeathEffects.push({
@@ -910,7 +965,70 @@ function resolveEnemyCollisions(now) {
         }
         break;
     }
+
+    if (brickWallEncounter && attackShape && player.attack !== brickWallEncounter.openingAttack &&
+        attackTouchesEnemy(attackShape, getEnemyRectangle(brickWallEncounter.crab))) {
+        const capturedCrab = brickWallEncounter.crab;
+        brickWallEncounter = null;
+        addCrabDeathEffect(capturedCrab, now);
+        gameState.score += 1;
+        player.laughUntil = now + LAUGH_DURATION_MS;
+        updateGameData();
+        if (gameState.score >= 15) {
+            gameState.won = true;
+            gameState.gameOver = true;
+        }
+    }
 }
+
+function beginBrickWallEncounter(enemy, now) {
+    const sectionHeight = canvas.height / 3;
+    const floorY = [canvas.height - 15, sectionHeight * 2, sectionHeight][enemy.floor];
+    const playerCenterX = player.x + player.width / 2;
+    const desiredWidth = enemy.width * 3 + BRICK_WALL_THICKNESS * 2;
+    const enclosureWidth = Math.min(canvas.width, desiredWidth);
+    const enclosureCenter = (playerCenterX + enemy.x) / 2;
+    const left = Math.max(0, Math.min(canvas.width - enclosureWidth, enclosureCenter - enclosureWidth / 2));
+    const right = left + enclosureWidth;
+    brickWallEncounter = {
+        crab: { ...enemy, isMoving: false, isRoaming: false },
+        floor: enemy.floor,
+        floorY,
+        top: floorY - sectionHeight + 8,
+        left,
+        right,
+        startTime: now,
+        openingAttack: player.attack
+    };
+    for (const other of enemies) {
+        if (other.floor !== enemy.floor) continue;
+        const midpoint = (left + right) / 2;
+        const hasLeftOutside = left >= other.width / 2;
+        const hasRightOutside = right + other.width / 2 <= canvas.width;
+        other.arenaSide = !hasLeftOutside ? 1
+            : (!hasRightOutside ? -1 : (other.x <= midpoint ? -1 : 1));
+        if (other.arenaSide < 0) other.x = Math.min(other.x, left - other.width / 2);
+        else other.x = Math.max(other.x, right + other.width / 2);
+    }
+}
+
+function addCrabDeathEffect(enemy, now) {
+    const hitDirection = getAttackTravelDirection();
+    crabDeathEffects.push({
+        x: enemy.x,
+        y: enemy.y + enemy.height / 2,
+        width: enemy.width,
+        height: enemy.height,
+        velocityX: hitDirection.x * 360,
+        velocityY: hitDirection.y * 360 - (hitDirection.y === 0 ? 180 : 0),
+        gravity: CRAB_DEATH_GRAVITY,
+        rotation: Math.PI,
+        rotationSpeed: hitDirection.x !== 0 ? hitDirection.x * 1.8 : -hitDirection.y * 1.8,
+        startTime: now,
+        lastUpdatedAt: now
+    });
+}
+
 function drawCrab(enemy, now = getGameTime()) {
     const centerX = enemy.x;
     const centerY = enemy.y + enemy.height * 0.52;
@@ -1006,6 +1124,40 @@ function drawCrabDeathAnimation(effect, now) {
     }
     ctx.globalAlpha = previousAlpha;
 }
+function drawBrickWallEncounter(encounter, now) {
+    const progress = Math.min(1, Math.max(0, (now - encounter.startTime) / BRICK_WALL_BUILD_DURATION_MS));
+    const wallHeight = (encounter.floorY - encounter.top) * progress;
+    const wallTop = encounter.floorY - wallHeight;
+    const left = encounter.left;
+    const right = encounter.right;
+    const brickHeight = 22;
+    const brickWidth = 42;
+    const drawBrickColumn = x => {
+        for (let y = encounter.floorY - brickHeight; y >= wallTop; y -= brickHeight) {
+            const row = Math.floor((encounter.floorY - y) / brickHeight);
+            ctx.fillStyle = row % 2 === 0 ? '#9b3d2e' : '#843126';
+            ctx.fillRect(x, Math.max(wallTop, y), BRICK_WALL_THICKNESS, Math.min(brickHeight - 2, encounter.floorY - Math.max(wallTop, y)));
+            ctx.strokeStyle = '#d08b68';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + BRICK_WALL_THICKNESS, y);
+            ctx.stroke();
+        }
+    };
+    drawBrickColumn(left);
+    drawBrickColumn(right - BRICK_WALL_THICKNESS);
+    const lintelWidth = (right - left - BRICK_WALL_THICKNESS * 2) * progress;
+    const lintelLeft = (left + right - lintelWidth) / 2;
+    for (let x = lintelLeft; x < lintelLeft + lintelWidth; x += brickWidth) {
+        ctx.fillStyle = Math.floor((x - lintelLeft) / brickWidth) % 2 === 0 ? '#9b3d2e' : '#843126';
+        ctx.fillRect(x, wallTop, Math.min(brickWidth - 2, lintelLeft + lintelWidth - x), BRICK_WALL_THICKNESS);
+        ctx.strokeStyle = '#d08b68';
+        ctx.lineWidth = 2;
+        ctx.strokeRect?.(x, wallTop, Math.min(brickWidth - 2, lintelLeft + lintelWidth - x), BRICK_WALL_THICKNESS);
+    }
+}
+
 function drawFloorWords(sectionHeight) {
     const previousFilter = ctx.filter || "none";
     ctx.filter = previousFilter === "none" ? "blur(4px)" : previousFilter + " blur(4px)";
@@ -1044,6 +1196,10 @@ function drawGame(now = getGameTime()) {
     }
     for (const deathEffect of crabDeathEffects) {
         drawCrabDeathAnimation(deathEffect, now);
+    }
+    if (brickWallEncounter) {
+        drawBrickWallEncounter(brickWallEncounter, now);
+        drawCrab({ ...brickWallEncounter.crab, isMoving: false }, now);
     }
     
     const immunityAge = PLAYER_IMMUNITY_MS - (gameState.immuneUntil - now);
@@ -1094,7 +1250,7 @@ function gameLoop(timestamp) {
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
     document.addEventListener('keydown', (e) => {
-        const key = e.code === 'Space' || e.key === ' ' ? 'Space' : e.key;
+        const key = e.code === 'Space' || e.key === ' ' ? 'Space' : ((e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key === 'Shift') ? 'Shift' : e.key);
         if (keys.hasOwnProperty(key)) {
             if (gameState.paused) {
                 if (key === "Space" && !gameState.gameOver) {
@@ -1119,7 +1275,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     });
 
     document.addEventListener('keyup', (e) => {
-        const key = e.code === 'Space' || e.key === ' ' ? 'Space' : e.key;
+        const key = e.code === 'Space' || e.key === ' ' ? 'Space' : ((e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key === 'Shift') ? 'Shift' : e.key);
         if (keys.hasOwnProperty(key)) {
             keys[key] = false;
             lastKeyboardInputTime = getAnimationTime();
@@ -1134,6 +1290,7 @@ if (typeof module !== 'undefined' && module.exports) {
         ladders,
         enemies,
         crabDeathEffects,
+        get brickWallEncounter() { return brickWallEncounter; },
         explosionEffects: crabDeathEffects,
         gameState,
         resizeCanvas,
