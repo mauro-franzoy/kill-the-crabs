@@ -252,8 +252,8 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
     const directionX = tipX - originX;
     if (directionX === 0 && tipY === originY) return;
 
-    const footLength = headRadius * 4;
-    const halfWidth = headRadius * 0.85;
+    const footLength = headRadius * 4 * 1.5;
+    const halfWidth = headRadius * 0.85 * 1.5;
     const bodySide = directionX >= 0 ? -1 : 1;
     const heelY = tipY + footLength * 0.16;
     const archY = tipY - footLength * 0.34;
@@ -306,8 +306,8 @@ function drawFistAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
     const unitY = directionY / directionLength;
     const perpendicularX = -unitY;
     const perpendicularY = unitX;
-    const fistLength = headRadius * 3;
-    const fistHalfWidth = headRadius * 1.2;
+    const fistLength = headRadius * 3 * 1.5;
+    const fistHalfWidth = headRadius * 1.2 * 1.5;
     const wristX = tipX - unitX * fistLength * 0.4;
     const wristY = tipY - unitY * fistLength * 0.4;
     const knucklesX = tipX + unitX * fistLength * 0.25;
