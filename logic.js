@@ -353,22 +353,24 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
 
     const footLength = headRadius * 4 * 1.5;
     const halfWidth = headRadius * 0.85 * 1.5;
-    const bodySide = directionX >= 0 ? -1 : 1;
     const heelY = tipY + footLength * 0.16;
     const archY = tipY - footLength * 0.34;
     const toeBaseY = tipY - footLength * 0.62;
 
+    // Draw a smooth foot body, then add the individual toes below.
     ctx.beginPath();
     ctx.moveTo(tipX - halfWidth * 0.28, heelY);
-    ctx.quadraticCurveTo(tipX - halfWidth * 0.6, tipY + footLength * 0.14,
-        tipX - halfWidth * 0.65, tipY + footLength * 0.04);
-    ctx.lineTo(tipX - halfWidth * 0.54, archY);
-    ctx.quadraticCurveTo(tipX - halfWidth * 1.1, toeBaseY, tipX - halfWidth, toeBaseY);
-    ctx.lineTo(tipX + halfWidth, toeBaseY);
-    ctx.quadraticCurveTo(tipX + halfWidth * 0.9, archY,
+    ctx.quadraticCurveTo(tipX - halfWidth * 0.68, tipY + footLength * 0.12,
+        tipX - halfWidth * 0.62, tipY - footLength * 0.02);
+    ctx.quadraticCurveTo(tipX - halfWidth * 0.76, archY,
+        tipX - halfWidth * 0.78, toeBaseY + footLength * 0.08);
+    ctx.quadraticCurveTo(tipX - halfWidth * 0.78, toeBaseY - footLength * 0.04,
+        tipX, toeBaseY - footLength * 0.035);
+    ctx.quadraticCurveTo(tipX + halfWidth * 0.78, toeBaseY - footLength * 0.04,
+        tipX + halfWidth * 0.78, toeBaseY + footLength * 0.08);
+    ctx.quadraticCurveTo(tipX + halfWidth * 0.76, archY,
         tipX + halfWidth * 0.38, tipY - footLength * 0.3);
-    ctx.lineTo(tipX + halfWidth * 0.28, tipY + footLength * 0.04);
-    ctx.quadraticCurveTo(tipX + halfWidth * 0.5, tipY + footLength * 0.14,
+    ctx.quadraticCurveTo(tipX + halfWidth * 0.28, tipY + footLength * 0.04,
         tipX + halfWidth * 0.28, heelY);
     ctx.closePath();
     ctx.fillStyle = color;
@@ -376,6 +378,8 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
     ctx.strokeStyle = color;
     ctx.stroke();
 
+    // Draw individual toes outside the foot body, matching the original silhouette.
+    const bodySide = directionX >= 0 ? -1 : 1;
     const toeLengths = [0.22, 0.18, 0.16, 0.14, 0.12];
     const toeOffsets = [0.68, 0.34, 0, -0.34, -0.68];
     for (let toe = 0; toe < toeLengths.length; toe++) {
@@ -385,7 +389,6 @@ function drawFootAtTip(tipX, tipY, originX, originY, headRadius, color = 'red') 
         const toeRadiusY = footLength * toeLengths[toe];
         const toeY = toeBaseY - toeRadiusY;
         const toeBend = isBigToe ? bodySide * 0.24 : 0;
-
         ctx.beginPath();
         ctx.ellipse(toeX, toeY, toeRadiusX, toeRadiusY, toeBend, 0, Math.PI * 2);
         ctx.fillStyle = color;
@@ -1438,7 +1441,7 @@ function drawDiningUtensils(playerX, playerY, size) {
     const handY = headY + size * 0.035;
     const handOffset = size * 0.24;
     const forkHandX = playerX - handOffset;
-    const knifeHandX = playerX + handOffset;
+    const secondForkHandX = playerX + handOffset;
     const utensilTopY = headY - size * 0.34;
 
     // The chef raises one red arm on each side of the head to hold the cutlery.
@@ -1448,39 +1451,33 @@ function drawDiningUtensils(playerX, playerY, size) {
     ctx.moveTo(playerX - size * 0.04, shoulderY);
     ctx.lineTo(forkHandX, handY);
     ctx.moveTo(playerX + size * 0.04, shoulderY);
-    ctx.lineTo(knifeHandX, handY);
+    ctx.lineTo(secondForkHandX, handY);
     ctx.stroke();
     ctx.fillStyle = '#d32f2f';
-    for (const handX of [forkHandX, knifeHandX]) {
+    for (const handX of [forkHandX, secondForkHandX]) {
         ctx.beginPath();
         ctx.arc(handX, handY, size * 0.035, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // White fork and knife, each about twice the previous length and thickness.
+    // Both white forks are raised beside the chef's head, with three upward tines.
     ctx.strokeStyle = '#ffffff';
-    ctx.fillStyle = '#ffffff';
     ctx.lineWidth = Math.max(4, size * 0.03);
-    ctx.beginPath();
-    ctx.moveTo(forkHandX, handY);
-    ctx.lineTo(forkHandX, utensilTopY + size * 0.1);
-    ctx.moveTo(forkHandX - size * 0.055, utensilTopY + size * 0.1);
-    ctx.lineTo(forkHandX, utensilTopY + size * 0.04);
-    ctx.lineTo(forkHandX + size * 0.055, utensilTopY + size * 0.1);
-    ctx.moveTo(forkHandX, utensilTopY + size * 0.1);
-    ctx.lineTo(forkHandX, utensilTopY);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(knifeHandX, handY);
-    ctx.lineTo(knifeHandX, utensilTopY + size * 0.11);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(knifeHandX - size * 0.035, utensilTopY + size * 0.12);
-    ctx.lineTo(knifeHandX + size * 0.045, utensilTopY - size * 0.015);
-    ctx.lineTo(knifeHandX + size * 0.035, utensilTopY + size * 0.14);
-    ctx.closePath();
-    ctx.fill();
+    for (const forkX of [forkHandX, secondForkHandX]) {
+        const handleTopY = utensilTopY + size * 0.1;
+        const tineSpread = size * 0.055;
+        ctx.beginPath();
+        ctx.moveTo(forkX, handY);
+        ctx.lineTo(forkX, handleTopY);
+        ctx.moveTo(forkX - tineSpread, handleTopY);
+        ctx.lineTo(forkX + tineSpread, handleTopY);
+        for (const tineOffset of [-1, 0, 1]) {
+            const tineX = forkX + tineOffset * tineSpread;
+            ctx.moveTo(tineX, handleTopY);
+            ctx.lineTo(tineX, utensilTopY);
+        }
+        ctx.stroke();
+    }
 }
 function drawFloorWords(sectionHeight) {
     const previousFilter = ctx.filter || "none";
