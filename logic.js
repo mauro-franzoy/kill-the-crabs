@@ -179,15 +179,16 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
     const isLaughing = player.laughUntil > now;
     if (isLaughing) {
         const facingSign = direction === "left" ? -1 : 1;
+        const faceRadius = headRadius * 1.5;
         const laughElapsed = now - (player.laughUntil - LAUGH_DURATION_MS);
         const laughPulse = (Math.sin(laughElapsed / 65) + 1) / 2;
         const headTilt = facingSign * (1.38 + laughPulse * 0.12);
-        const headCenterX = centerX - facingSign * headRadius * 0.35;
+        const headCenterX = centerX - facingSign * faceRadius * 0.35;
         const previousFont = ctx.font;
         const previousTextAlign = ctx.textAlign;
         const previousTextBaseline = ctx.textBaseline;
         ctx.fillStyle = playerColor;
-        ctx.font = "bold " + Math.max(12, Math.round(headRadius * 0.55)) + "px Arial";
+        ctx.font = "bold " + Math.max(12, Math.round(faceRadius * 0.55)) + "px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const laughText = [
@@ -196,35 +197,35 @@ function drawStickman(x, y, height, direction, animationFrame, isClimbing, attac
             { text: "HA!", x: 1.98, y: 0.62 }
         ];
         for (const word of laughText) {
-            ctx.fillText(word.text, centerX - facingSign * headRadius * word.x, headY + headRadius * word.y);
+            ctx.fillText(word.text, centerX - facingSign * faceRadius * word.x, headY + faceRadius * word.y);
         }
         ctx.font = previousFont;
         ctx.textAlign = previousTextAlign;
         ctx.textBaseline = previousTextBaseline;
 
         ctx.beginPath();
-        ctx.ellipse(headCenterX, headY, headRadius * 0.9, headRadius, headTilt, 0, Math.PI * 2);
+        ctx.ellipse(headCenterX, headY, faceRadius * 0.9, faceRadius, headTilt, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
-        ctx.ellipse(headCenterX + facingSign * headRadius * 0.18, headY + headRadius * 0.22,
-            headRadius * 0.48, headRadius * (0.2 + laughPulse * 0.14), headTilt, 0, Math.PI * 2);
+        ctx.ellipse(headCenterX + facingSign * faceRadius * 0.18, headY + faceRadius * 0.22,
+            faceRadius * 0.48, faceRadius * (0.2 + laughPulse * 0.14), headTilt, 0, Math.PI * 2);
         ctx.fillStyle = "black";
         ctx.fill();
         ctx.stroke();
         ctx.strokeStyle = playerColor;
-        const eyeY = headY - headRadius * 0.43;
-        const eyeHalfWidth = headRadius * 0.4;
-        const eyeHalfHeight = headRadius * 0.14;
+        const eyeY = headY - faceRadius * 0.43;
+        const eyeHalfWidth = faceRadius * 0.4;
+        const eyeHalfHeight = faceRadius * 0.14;
         ctx.beginPath();
         ctx.moveTo(headCenterX - eyeHalfWidth, eyeY - eyeHalfHeight);
         ctx.lineTo(headCenterX + eyeHalfWidth, eyeY + eyeHalfHeight);
         ctx.moveTo(headCenterX - eyeHalfWidth, eyeY + eyeHalfHeight);
         ctx.lineTo(headCenterX + eyeHalfWidth, eyeY - eyeHalfHeight);
         ctx.stroke();
-        const tearHalfWidth = headRadius * 0.12;
-        const tearHeight = headRadius * 0.22;
-        const tearX = headCenterX + facingSign * (eyeHalfWidth + tearHalfWidth + headRadius * 0.12);
-        const tearY = eyeY + headRadius * 0.2;
+        const tearHalfWidth = faceRadius * 0.12;
+        const tearHeight = faceRadius * 0.22;
+        const tearX = headCenterX - facingSign * (eyeHalfWidth + tearHalfWidth + faceRadius * 0.12);
+        const tearY = eyeY + faceRadius * 0.2;
         ctx.beginPath();
         ctx.moveTo(tearX, tearY - tearHeight);
         ctx.quadraticCurveTo(tearX + tearHalfWidth, tearY - tearHeight * 0.2, tearX + tearHalfWidth, tearY + tearHeight * 0.35);
@@ -943,7 +944,7 @@ function drawFloorWords(sectionHeight) {
 }
 
 function drawGame(now = getGameTime()) {
-    ctx.filter = gameState.gameOver ? 'blur(16px)' : 'none';
+    ctx.filter = (gameState.gameOver || gameState.paused) ? 'blur(16px)' : 'none';
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
