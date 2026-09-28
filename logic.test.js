@@ -815,6 +815,59 @@ function testCombatAttacksAndExplosions() {
     return true;
 }
 
+function testVictoryAtFiftyPoints() {
+    setupMockEnvironment();
+    const logic = require("./logic.js");
+    logic.resizeCanvas();
+    logic.player.x = 200;
+    logic.player.currentFloor = 2;
+    logic.player.isClimbing = false;
+    logic.player.attack = { type: "kick", direction: "right", frame: 6 };
+    logic.gameState.score = 49;
+    const enemyHeight = logic.player.height / 2;
+    const sectionHeight = mockCanvas.height / 3;
+    logic.enemies.push({
+        x: logic.player.x + logic.player.height * 1.25,
+        y: sectionHeight - enemyHeight,
+        width: enemyHeight * 1.5,
+        height: enemyHeight,
+        floor: 2
+    });
+    const originalRandom = Math.random;
+    Math.random = function() { return 0.5; };
+    try {
+        logic.updateEnemies(1000);
+        if (logic.gameState.score !== 50 || !logic.gameState.gameOver || !logic.gameState.won) {
+            console.error("Test failed: reaching 50 points should trigger a win and end the game");
+            return false;
+        }
+        const frozenPlayerX = logic.player.x;
+        logic.updatePlayer(1010);
+        if (logic.player.x !== frozenPlayerX) {
+            console.error("Test failed: the game should freeze after reaching the winning score");
+            return false;
+        }
+        const firstStroke = mockCtx.strokeFilters.length;
+        logic.drawGame(1000);
+        if (!mockCtx.strokeFilters.slice(firstStroke).includes("blur(16px)")) {
+            console.error("Test failed: the scene should be blurred behind the victory message");
+            return false;
+        }
+        const backing = mockCtx.fillRectCalls.slice(-1)[0];
+        const message = mockCtx.fillTextCalls.slice(-1)[0];
+        if (!backing || backing.fillStyle !== "black" || backing.width !== 1140 || backing.height !== 270 ||
+            !message || message.text !== "YOU WIN!!!" || message.fillStyle !== "darkgreen" ||
+            message.filter !== "none" || message.x !== mockCanvas.width / 2 || message.y !== mockCanvas.height / 2) {
+            console.error("Test failed: a centered YOU WIN!!! message should appear on a black rectangle");
+            return false;
+        }
+    } finally {
+        Math.random = originalRandom;
+        teardownMockEnvironment();
+    }
+    console.log("testVictoryAtFiftyPoints passed");
+    return true;
+}
 function testPlayerDamageImmunityAndGameOver() {
     setupMockEnvironment();
     const logic = require("./logic.js");
@@ -888,8 +941,15 @@ function testPlayerDamageImmunityAndGameOver() {
         }
         const gameOverStrokeStart = mockCtx.strokeFilters.length;
         logic.drawGame(17000);
-        if (!mockCtx.strokeFilters.slice(gameOverStrokeStart).includes("blur(8px)")) {
+        if (!mockCtx.strokeFilters.slice(gameOverStrokeStart).includes("blur(16px)")) {
             console.error("Test failed: the game scene should be blurred behind the game-over message");
+            return false;
+        }
+        const gameOverBox = mockCtx.fillRectCalls.slice(-1)[0];
+        if (!gameOverBox || gameOverBox.fillStyle !== "black" ||
+            gameOverBox.x !== mockCanvas.width / 2 - 570 || gameOverBox.y !== mockCanvas.height / 2 - 135 ||
+            gameOverBox.width !== 1140 || gameOverBox.height !== 270) {
+            console.error("Test failed: game over should have a centered black backing rectangle");
             return false;
         }
         const finalMessage = mockCtx.fillTextCalls.slice(-1)[0];
@@ -1078,6 +1138,7 @@ function runAllTests() {
         testLadderFloor2ToFloor1Descending(),
         testSpacebarAttackAnimations(),
         testCombatAttacksAndExplosions(),
+        testVictoryAtFiftyPoints(),
         testPlayerDamageImmunityAndGameOver(),
         testEnemySpawningAndDrawing(),
         testFindClosestFloor()
@@ -1109,6 +1170,7 @@ if (typeof module !== 'undefined' && module.exports) {
         testLadderFloor2ToFloor1Descending,
         testSpacebarAttackAnimations,
         testCombatAttacksAndExplosions,
+        testVictoryAtFiftyPoints,
         testPlayerDamageImmunityAndGameOver,
         testEnemySpawningAndDrawing,
         testFindClosestFloor,

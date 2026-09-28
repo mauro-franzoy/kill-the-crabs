@@ -38,7 +38,7 @@ function getAnimationTime() {
 const ladders = [];
 const enemies = [];
 const explosionEffects = [];
-const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false };
+const gameState = { score: 0, lives: 3, immuneUntil: 0, gameOver: false, won: false };
 const PLAYER_IMMUNITY_MS = 8000;
 const EXPLOSION_DURATION_MS = 300;
 const ENEMY_SPAWN_INTERVAL_MS = 5000;
@@ -719,6 +719,11 @@ function resolveEnemyCollisions(now) {
             });
             gameState.score += 1;
             updateGameData();
+            if (gameState.score >= 50) {
+                gameState.won = true;
+                gameState.gameOver = true;
+                break;
+            }
             continue;
         }
 
@@ -834,7 +839,7 @@ function drawFloorWords(sectionHeight) {
 }
 
 function drawGame(now = getAnimationTime()) {
-    ctx.filter = gameState.gameOver ? 'blur(8px)' : 'none';
+    ctx.filter = gameState.gameOver ? 'blur(16px)' : 'none';
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
@@ -862,11 +867,13 @@ function drawGame(now = getAnimationTime()) {
     }
     if (gameState.gameOver) {
         ctx.filter = "none";
+        ctx.fillStyle = "black";
+        ctx.fillRect(canvas.width / 2 - 570, canvas.height / 2 - 135, 1140, 270);
         ctx.fillStyle = "darkgreen";
         ctx.font = "900 192px Arial";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+        ctx.fillText(gameState.won ? "YOU WIN!!!" : "GAME OVER", canvas.width / 2, canvas.height / 2);
     }
     ctx.filter = "none";
 }
