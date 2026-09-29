@@ -112,6 +112,11 @@ function setupMockEnvironment() {
         fillText: function(text, x, y) {
             this.fillTextCalls.push({ text, x, y, fillStyle: this.fillStyle, font: this.font, textAlign: this.textAlign, textBaseline: this.textBaseline, filter: this.filter });
         },
+
+        measureText: function(text) {
+            const fontSize = Number((this.font || '').match(/([0-9.]+)px/)?.[1] || 16);
+            return { width: text.length * fontSize * 0.62 };
+        },
         
         arc: function(x, y, radius, startAngle, endAngle) {
             this.arcCalls.push({ x, y, radius, startAngle, endAngle });
@@ -165,7 +170,7 @@ function teardownMockEnvironment() {
     delete global.requestAnimationFrame;
     delete global.canvas;
     delete global.ctx;
-    try { delete require.cache[require.resolve("../resources/v1.0.1/logic.js")]; } catch(e){}
+    try { delete require.cache[require.resolve("../resources/v1.3/logic.js")]; } catch(e){}
 }
 
 

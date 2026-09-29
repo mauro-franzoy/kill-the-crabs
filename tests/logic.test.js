@@ -5,6 +5,7 @@ const groups = [
     require('./logic.combat.test.js'),
     require('./logic.enemies.test.js'),
     require('./logic.touch-controls.test.js'),
+    require('./logic.audio.test.js'),
 ];
 
 const tests = Object.assign({}, ...groups);

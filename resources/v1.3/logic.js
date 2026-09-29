@@ -36,6 +36,85 @@ const LAUGH_DURATION_MS = 1200;
 const IDLE_PAUSE_TIMEOUT_MS = 10000;
 const MAX_VISIBLE_ENEMIES = 10;
 
+let soundContext = null;
+function getSoundContext() {
+    if (soundContext) {
+        if (soundContext.state === "suspended" && soundContext.resume) soundContext.resume();
+        return soundContext;
+    }
+    if (typeof window === "undefined") return null;
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextConstructor) return null;
+    try {
+        soundContext = new AudioContextConstructor();
+        if (soundContext.state === "suspended" && soundContext.resume) soundContext.resume();
+        return soundContext;
+    } catch (error) {
+        return null;
+    }
+}
+
+function playTone(startFrequency, endFrequency, delay, duration, type = "sine", volume = 0.12) {
+    const audio = getSoundContext();
+    if (!audio || !audio.createOscillator || !audio.createGain) return;
+    try {
+        const start = audio.currentTime + delay;
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(startFrequency, start);
+        oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), start + duration);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(volume, start + 0.008);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        oscillator.connect(gain);
+        gain.connect(audio.destination);
+        oscillator.start(start);
+        oscillator.stop(start + duration + 0.01);
+    } catch (error) {
+        // Unsupported audio features should never interrupt gameplay.
+    }
+}
+
+function playGameSound(sound) {
+    if (sound === "laugh") {
+        const speech = typeof window !== "undefined" && window.speechSynthesis;
+        const Utterance = typeof SpeechSynthesisUtterance !== "undefined"
+            ? SpeechSynthesisUtterance
+            : (typeof window !== "undefined" ? window.SpeechSynthesisUtterance : null);
+        if (speech && Utterance) {
+            try {
+                speech.cancel();
+                const laugh = new Utterance("Ha ha ha!");
+                laugh.rate = 1.2;
+                laugh.pitch = 1.15;
+                speech.speak(laugh);
+                return;
+            } catch (error) {
+                // Fall through to the synthesized laugh.
+            }
+        }
+        for (let syllable = 0; syllable < 3; syllable++) {
+            playTone(260, 420, syllable * 0.22, 0.09, "sawtooth", 0.07);
+            playTone(420, 300, syllable * 0.22 + 0.09, 0.08, "sawtooth", 0.06);
+        }
+    } else if (sound === "boil") {
+        for (let bubble = 0; bubble < 5; bubble++) {
+            const delay = CRAB_NET_CAPTURE_DURATION_MS / 1000 + bubble * 0.15 + (bubble % 2) * 0.025;
+            const pitch = 115 + (bubble * 37) % 95;
+            playTone(pitch, pitch * 0.58, delay, 0.16, "sine", 0.09);
+        }
+    } else if (sound === "glass") {
+        playTone(1250, 2100, 0, 0.32, "sine", 0.14);
+        playTone(1880, 960, 0.025, 0.42, "sine", 0.1);
+        playTone(2470, 1380, 0.06, 0.28, "triangle", 0.08);
+        playTone(790, 320, 0, 0.09, "square", 0.035);
+    } else if (sound === "punch") {
+        playTone(155, 48, 0, 0.16, "triangle", 0.2);
+        playTone(720, 180, 0, 0.07, "square", 0.07);
+    }
+}
+
 function getAnimationTime() {
     return (typeof performance !== 'undefined' && typeof performance.now === 'function')
         ? performance.now()
@@ -83,6 +162,9 @@ function updateGameData() {
 updateGameData();
 const gameInstructions = document.getElementById("game-instructions");
 if (gameInstructions) {
+    if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) {
+        gameInstructions.innerHTML = "Move with the D-pad. Use Hit.<br>Do not use Cook.";
+    }
     setTimeout(() => {
         gameInstructions.hidden = true;
         gameInstructions.style.display = "none";
@@ -936,6 +1018,7 @@ function resolveEnemyCollisions(now) {
         const enemy = enemies[index];
         const enemyRectangle = getEnemyRectangle(enemy);
         if (attackShape && attackTouchesEnemy(attackShape, enemyRectangle)) {
+            playGameSound("punch");
             if (!brickWallEncounter && player.attack.brickWall && enemy.floor === player.currentFloor) {
                 enemies.splice(index, 1);
                 beginBrickWallEncounter(enemy, now);
@@ -958,6 +1041,7 @@ function resolveEnemyCollisions(now) {
             });
             gameState.score += 1;
             player.laughUntil = now + LAUGH_DURATION_MS;
+            playGameSound("laugh");
             updateGameData();
             if (gameState.score >= 15) {
                 gameState.won = true;
@@ -968,6 +1052,7 @@ function resolveEnemyCollisions(now) {
         }
 
         if (immune || !playerBodyTouchesEnemy(enemyRectangle)) continue;
+        playGameSound("glass");
         gameState.lives = Math.max(0, gameState.lives - 1);
         gameState.immuneUntil = now + PLAYER_IMMUNITY_MS;
         updateGameData();
@@ -981,6 +1066,7 @@ function resolveEnemyCollisions(now) {
 }
 
 function beginBrickWallEncounter(enemy, now) {
+    playGameSound("boil");
     const sectionHeight = canvas.height / 3;
     const floorY = [canvas.height - 15, sectionHeight * 2, sectionHeight][enemy.floor];
     const playerCenterX = player.x + player.width / 2;
@@ -1498,6 +1584,19 @@ function drawFloorWords(sectionHeight) {
     ctx.filter = previousFilter;
 }
 
+function getBannerFontSize(message, maximumSize, maximumWidth, maximumHeight) {
+    let fontSize = Math.min(maximumSize, maximumHeight * 0.62);
+    const availableWidth = maximumWidth * 0.92;
+    if (ctx.measureText) {
+        ctx.font = `900 ${fontSize}px Arial`;
+        const measuredWidth = ctx.measureText(message).width;
+        if (measuredWidth > availableWidth) fontSize *= availableWidth / measuredWidth;
+    } else {
+        fontSize = Math.min(fontSize, availableWidth / (message.length * 0.7));
+    }
+    return Math.max(12, Math.floor(fontSize));
+}
+
 function drawGame(now = getGameTime()) {
     ctx.filter = (gameState.gameOver || (gameState.paused && !gameState.manualPaused)) ? 'blur(16px)' : 'none';
     ctx.fillStyle = 'black';
@@ -1556,23 +1655,31 @@ function drawGame(now = getGameTime()) {
         drawButterflyNet(brickWallEncounter, player.height * 0.62);
     }
     if (gameState.paused && !gameState.manualPaused) {
+        const bannerWidth = Math.min(1140, canvas.width * 0.9);
+        const bannerHeight = Math.min(270, canvas.height * 0.34);
+        const message = "HIT TO RESUME";
         ctx.filter = "none";
         ctx.fillStyle = "black";
-        ctx.fillRect(canvas.width / 2 - 570, canvas.height / 2 - 135, 1140, 270);
+        ctx.fillRect((canvas.width - bannerWidth) / 2, (canvas.height - bannerHeight) / 2,
+            bannerWidth, bannerHeight);
         ctx.fillStyle = "darkgreen";
-        ctx.font = "900 88px Arial";
+        ctx.font = `900 ${getBannerFontSize(message, 88, bannerWidth, bannerHeight)}px Arial`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText("SPACEBAR TO RESUME", canvas.width / 2, canvas.height / 2);
+        ctx.fillText(message, canvas.width / 2, canvas.height / 2);
     } else if (gameState.gameOver) {
+        const bannerWidth = Math.min(1140, canvas.width * 0.9);
+        const bannerHeight = Math.min(270, canvas.height * 0.34);
+        const message = gameState.won ? "YOU WIN!!!" : "GAME OVER";
         ctx.filter = "none";
         ctx.fillStyle = "black";
-        ctx.fillRect(canvas.width / 2 - 570, canvas.height / 2 - 135, 1140, 270);
+        ctx.fillRect((canvas.width - bannerWidth) / 2, (canvas.height - bannerHeight) / 2,
+            bannerWidth, bannerHeight);
         ctx.fillStyle = "darkgreen";
-        ctx.font = "900 192px Arial";
+        ctx.font = `900 ${getBannerFontSize(message, 192, bannerWidth, bannerHeight)}px Arial`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(gameState.won ? "YOU WIN!!!" : "GAME OVER", canvas.width / 2, canvas.height / 2);
+        ctx.fillText(message, canvas.width / 2, canvas.height / 2);
     }
     ctx.filter = "none";
 }
@@ -1629,6 +1736,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
             const button = e.target && e.target.closest ? e.target.closest('[data-touch-action], [data-direction]') : null;
             if (!button || gameState.gameOver) return;
             if (e.preventDefault) e.preventDefault();
+            getSoundContext();
             if (button.setPointerCapture && e.pointerId !== undefined) button.setPointerCapture(e.pointerId);
             const direction = button.dataset.direction;
             if (direction && keys.hasOwnProperty(direction)) {
@@ -1659,6 +1767,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
         touchControls.addEventListener('lostpointercapture', releaseTouchDirection);
     }
     document.addEventListener('keydown', (e) => {
+        getSoundContext();
         const key = e.code === 'Space' || e.key === ' ' ? 'Space' :
             ((e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key === 'Shift') ? 'Shift' :
                 ((e.key || '').toLowerCase() === 'p' ? 'Pause' : e.key));
@@ -1754,7 +1863,8 @@ if (typeof module !== 'undefined' && module.exports) {
         drawCrab,
         findClosestFloor,
         drawGame,
-        gameLoop
+        gameLoop,
+        playGameSound
     };
 }
 

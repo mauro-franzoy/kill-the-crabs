@@ -10,7 +10,7 @@ function testTouchHitAndCookControls() {
         return originalGetElementById.call(this, id);
     };
 
-    const logic = require('../resources/v1.0.1/logic.js');
+    const logic = require('../resources/v1.3/logic.js');
     logic.resizeCanvas();
 
     function tap(action) {

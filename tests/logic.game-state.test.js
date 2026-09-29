@@ -1,5 +1,81 @@
 const { setupMockEnvironment, teardownMockEnvironment } = require('./test-helpers.js');
 
+function testMobileBannersFitCanvas() {
+    setupMockEnvironment();
+    window.innerWidth = 360;
+    window.innerHeight = 640;
+    const logic = require("../resources/v1.3/logic.js");
+    logic.resizeCanvas();
+
+    logic.gameState.paused = true;
+    logic.gameState.manualPaused = false;
+    logic.drawGame(1000);
+    const pauseBox = mockCtx.fillRectCalls.slice(-1)[0];
+    const pauseText = mockCtx.fillTextCalls.slice(-1)[0];
+    if (!pauseBox || pauseBox.x < 0 || pauseBox.x + pauseBox.width > mockCanvas.width ||
+        pauseBox.y < 0 || pauseBox.y + pauseBox.height > mockCanvas.height ||
+        !pauseText || pauseText.text !== "HIT TO RESUME" ||
+        Number(pauseText.font.match(/([0-9.]+)px/)[1]) >= 88) {
+        console.error("Test failed: pause banner should fit a mobile canvas and show HIT TO RESUME");
+        teardownMockEnvironment();
+        return false;
+    }
+
+    logic.gameState.paused = false;
+    logic.gameState.gameOver = true;
+    logic.gameState.won = true;
+    logic.drawGame(1000);
+    const endBox = mockCtx.fillRectCalls.slice(-1)[0];
+    const endText = mockCtx.fillTextCalls.slice(-1)[0];
+    if (!endBox || endBox.x < 0 || endBox.x + endBox.width > mockCanvas.width ||
+        endBox.y < 0 || endBox.y + endBox.height > mockCanvas.height ||
+        !endText || endText.text !== "YOU WIN!!!" ||
+        Number(endText.font.match(/([0-9.]+)px/)[1]) >= 192) {
+        console.error("Test failed: victory banner should fit a mobile canvas");
+        teardownMockEnvironment();
+        return false;
+    }
+
+    logic.gameState.won = false;
+    logic.drawGame(1000);
+    const gameOverBox = mockCtx.fillRectCalls.slice(-1)[0];
+    const gameOverText = mockCtx.fillTextCalls.slice(-1)[0];
+    if (!gameOverBox || gameOverBox.x < 0 || gameOverBox.x + gameOverBox.width > mockCanvas.width ||
+        gameOverBox.y < 0 || gameOverBox.y + gameOverBox.height > mockCanvas.height ||
+        !gameOverText || gameOverText.text !== "GAME OVER") {
+        console.error("Test failed: game-over banner should fit a mobile canvas");
+        teardownMockEnvironment();
+        return false;
+    }
+
+    teardownMockEnvironment();
+    console.log("testMobileBannersFitCanvas passed");
+    return true;
+}
+
+function testMobileInstructionsUseHitNotCook() {
+    setupMockEnvironment();
+    mockGameInstructions = {
+        hidden: false,
+        style: { display: "flex" },
+        innerHTML: "Use arrows and spacebar.<br>Do not use shift + space bar."
+    };
+    window.matchMedia = query => ({ matches: query === "(pointer: coarse)" });
+
+    try {
+        require("../resources/v1.3/logic.js");
+        if (mockGameInstructions.innerHTML !== "Move with the D-pad. Use Hit.<br>Do not use Cook.") {
+            console.error("Test failed: mobile instructions should recommend Hit and tell players not to use Cook");
+            return false;
+        }
+    } finally {
+        teardownMockEnvironment();
+    }
+
+    console.log("testMobileInstructionsUseHitNotCook passed");
+    return true;
+}
+
 function testGameInstructionsDisappearAfterTenSeconds() {
     setupMockEnvironment();
     const scheduledTimeouts = [];
@@ -10,7 +86,7 @@ function testGameInstructionsDisappearAfterTenSeconds() {
     };
 
     try {
-        require("../resources/v1.0.1/logic.js");
+        require("../resources/v1.3/logic.js");
         const timer = scheduledTimeouts[0];
         if (!timer || timer.delay !== 10000 || mockGameInstructions.hidden || mockGameInstructions.style.display !== "flex") {
             console.error("Test failed: instructions should remain visible until the 10-second timer");
@@ -31,7 +107,7 @@ function testGameInstructionsDisappearAfterTenSeconds() {
 
 function testIdlePauseAndResume() {
     setupMockEnvironment();
-    const logic = require("../resources/v1.0.1/logic.js");
+    const logic = require("../resources/v1.3/logic.js");
     logic.resizeCanvas();
     logic.player.x = 300;
     logic.keys.ArrowRight = true;
@@ -52,7 +128,7 @@ function testIdlePauseAndResume() {
             return false;
         }
         const pausedMessage = mockCtx.fillTextCalls.slice(-1)[0];
-        if (!pausedMessage || pausedMessage.text !== "SPACEBAR TO RESUME" ||
+        if (!pausedMessage || pausedMessage.text !== "HIT TO RESUME" ||
             !mockCtx.strokeFilters.includes("blur(16px)")) {
             console.error("Test failed: idle pause should show its resume banner over a blurred scene");
             return false;
@@ -86,7 +162,7 @@ function testIdlePauseAndResume() {
 
 function testVictoryAtFifteenKills() {
     setupMockEnvironment();
-    const logic = require("../resources/v1.0.1/logic.js");
+    const logic = require("../resources/v1.3/logic.js");
     logic.resizeCanvas();
     logic.player.x = 200;
     logic.player.currentFloor = 2;
@@ -124,7 +200,7 @@ function testVictoryAtFifteenKills() {
         }
         const backing = mockCtx.fillRectCalls.slice(-1)[0];
         const message = mockCtx.fillTextCalls.slice(-1)[0];
-        if (!backing || backing.fillStyle !== "black" || backing.width !== 1140 || backing.height !== 270 ||
+        if (!backing || backing.fillStyle !== "black" || backing.width !== Math.min(1140, mockCanvas.width * 0.9) || backing.height !== Math.min(270, mockCanvas.height * 0.34) ||
             !message || message.text !== "YOU WIN!!!" || message.fillStyle !== "darkgreen" ||
             message.filter !== "none" || message.x !== mockCanvas.width / 2 || message.y !== mockCanvas.height / 2) {
             console.error("Test failed: a centered YOU WIN!!! message should appear on a black rectangle");
@@ -140,7 +216,7 @@ function testVictoryAtFifteenKills() {
 
 function testPlayerDamageImmunityAndGameOver() {
     setupMockEnvironment();
-    const logic = require("../resources/v1.0.1/logic.js");
+    const logic = require("../resources/v1.3/logic.js");
     logic.resizeCanvas();
     logic.player.x = 500;
     logic.player.currentFloor = 2;
@@ -217,14 +293,16 @@ function testPlayerDamageImmunityAndGameOver() {
         }
         const gameOverBox = mockCtx.fillRectCalls.slice(-1)[0];
         if (!gameOverBox || gameOverBox.fillStyle !== "black" ||
-            gameOverBox.x !== mockCanvas.width / 2 - 570 || gameOverBox.y !== mockCanvas.height / 2 - 135 ||
-            gameOverBox.width !== 1140 || gameOverBox.height !== 270) {
+            gameOverBox.x !== (mockCanvas.width - Math.min(1140, mockCanvas.width * 0.9)) / 2 ||
+            gameOverBox.y !== (mockCanvas.height - Math.min(270, mockCanvas.height * 0.34)) / 2 ||
+            gameOverBox.width !== Math.min(1140, mockCanvas.width * 0.9) ||
+            gameOverBox.height !== Math.min(270, mockCanvas.height * 0.34)) {
             console.error("Test failed: game over should have a centered black backing rectangle");
             return false;
         }
         const finalMessage = mockCtx.fillTextCalls.slice(-1)[0];
         if (!finalMessage || finalMessage.text !== "GAME OVER" ||
-            finalMessage.fillStyle !== "darkgreen" || finalMessage.font !== "900 192px Arial" || finalMessage.filter !== "none" ||
+            finalMessage.fillStyle !== "darkgreen" || !finalMessage.font.startsWith("900 ") || finalMessage.filter !== "none" ||
             finalMessage.x !== mockCanvas.width / 2 || finalMessage.y !== mockCanvas.height / 2) {
             console.error("Test failed: game over should display large centered dark green text");
             return false;
@@ -237,4 +315,5 @@ function testPlayerDamageImmunityAndGameOver() {
     return true;
 }
 
-module.exports = { testGameInstructionsDisappearAfterTenSeconds, testIdlePauseAndResume, testVictoryAtFifteenKills, testPlayerDamageImmunityAndGameOver };
+module.exports = {
+    testMobileInstructionsUseHitNotCook, testMobileBannersFitCanvas, testGameInstructionsDisappearAfterTenSeconds, testIdlePauseAndResume, testVictoryAtFifteenKills, testPlayerDamageImmunityAndGameOver };
