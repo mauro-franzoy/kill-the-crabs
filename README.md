@@ -5,6 +5,7 @@
 
 
 This is an AI-assisted prototype of a 2D vanilla javascript game.
+I decided not to include an AGENTS.md file for this project.
 
 ![illustrative image](images/kill-the-crabs.png)
 

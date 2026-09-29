@@ -1623,6 +1623,41 @@ function gameLoop(timestamp) {
     }
 }
 if (typeof document !== 'undefined' && document.addEventListener) {
+    const touchControls = document.getElementById('touch-controls');
+    if (touchControls && touchControls.addEventListener) {
+        touchControls.addEventListener('pointerdown', (e) => {
+            const button = e.target && e.target.closest ? e.target.closest('[data-touch-action], [data-direction]') : null;
+            if (!button || gameState.gameOver) return;
+            if (e.preventDefault) e.preventDefault();
+            if (button.setPointerCapture && e.pointerId !== undefined) button.setPointerCapture(e.pointerId);
+            const direction = button.dataset.direction;
+            if (direction && keys.hasOwnProperty(direction)) {
+                if (!gameState.paused) keys[direction] = true;
+                lastKeyboardInputTime = getAnimationTime();
+                return;
+            }
+            lastKeyboardInputTime = getAnimationTime();
+            if (gameState.paused) {
+                pausedDurationMs += getAnimationTime() - pausedAtWallTime;
+                pausedAtWallTime = null;
+                gameState.paused = false;
+                gameState.manualPaused = false;
+                if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(gameLoop);
+            }
+            spacePressedPending = true;
+            spacePressedWithShift = button.dataset.touchAction === 'cook';
+        });
+        const releaseTouchDirection = (e) => {
+            const button = e.target && e.target.closest ? e.target.closest('[data-direction]') : null;
+            if (!button) return;
+            const direction = button.dataset.direction;
+            if (keys.hasOwnProperty(direction)) keys[direction] = false;
+            lastKeyboardInputTime = getAnimationTime();
+        };
+        touchControls.addEventListener('pointerup', releaseTouchDirection);
+        touchControls.addEventListener('pointercancel', releaseTouchDirection);
+        touchControls.addEventListener('lostpointercapture', releaseTouchDirection);
+    }
     document.addEventListener('keydown', (e) => {
         const key = e.code === 'Space' || e.key === ' ' ? 'Space' :
             ((e.code === 'ShiftLeft' || e.code === 'ShiftRight' || e.key === 'Shift') ? 'Shift' :

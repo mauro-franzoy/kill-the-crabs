@@ -16,6 +16,18 @@
         </div>
     </div>
     <canvas id="gameCanvas"></canvas>
+    <div id="touch-controls" aria-label="Touch game controls">
+        <div id="touch-dpad" aria-label="Movement controls">
+            <button type="button" data-direction="ArrowUp" aria-label="Move up">UP</button>
+            <button type="button" data-direction="ArrowLeft" aria-label="Move left">LEFT</button>
+            <button type="button" data-direction="ArrowDown" aria-label="Move down">DOWN</button>
+            <button type="button" data-direction="ArrowRight" aria-label="Move right">RIGHT</button>
+        </div>
+        <div id="touch-attacks">
+            <button type="button" data-touch-action="hit" aria-label="Regular hit">Hit</button>
+            <button type="button" data-touch-action="cook" aria-label="Special cooking attack">Cook</button>
+        </div>
+    </div>
     <script src="logic.js"></script>
     <script src="https://storage.ko-fi.com/cdn/widget/Widget_2.js"></script>
     <script type="text/javascript">kofiwidget2.init('Support me on Ko-fi', '#72a4f2', 'P3S22359A3');kofiwidget2.draw();</script>
