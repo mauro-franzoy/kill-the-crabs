@@ -3,7 +3,7 @@ const { setupMockEnvironment, teardownMockEnvironment } = require('./test-helper
 function testFindClosestFloor() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     
     const sectionHeight = mockCanvas.height / 3;
     const playerHeight = sectionHeight * 0.8;
@@ -43,7 +43,7 @@ function testFindClosestFloor() {
 function testEnemySpawningAndDrawing() {
     setupMockEnvironment();
 
-    const logic = require("../logic.js");
+    const logic = require("../resources/v1.0.1/logic.js");
     logic.resizeCanvas();
     logic.player.x = 590;
     logic.enemies.length = 0;

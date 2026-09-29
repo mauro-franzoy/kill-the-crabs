@@ -2,7 +2,7 @@ const { setupMockEnvironment, teardownMockEnvironment } = require('./test-helper
 
 function testCombatAttacksAndExplosions() {
     setupMockEnvironment();
-    let logic = require("../logic.js");
+    let logic = require("../resources/v1.0.1/logic.js");
     logic.resizeCanvas();
     logic.player.x = 200;
     logic.player.currentFloor = 2;
@@ -111,7 +111,7 @@ function testCombatAttacksAndExplosions() {
     teardownMockEnvironment();
 
     setupMockEnvironment();
-    logic = require("../logic.js");
+    logic = require("../resources/v1.0.1/logic.js");
     logic.resizeCanvas();
     logic.player.x = mockCanvas.width * 0.5;
     logic.player.y = 260;
@@ -143,7 +143,7 @@ function testCrabDeathFollowsHitDirection() {
     ];
     for (const scenario of scenarios) {
         setupMockEnvironment();
-        const logic = require("../logic.js");
+        const logic = require("../resources/v1.0.1/logic.js");
         logic.resizeCanvas();
         logic.player.x = 600;
         logic.player.direction = scenario.playerDirection;

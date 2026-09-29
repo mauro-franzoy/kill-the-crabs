@@ -3,7 +3,7 @@ const { setupMockEnvironment, teardownMockEnvironment } = require('./test-helper
 function testDrawFloorLines() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     const sectionHeight = mockCanvas.height / 3;
     
     logic.drawFloorLines(sectionHeight);
@@ -46,7 +46,7 @@ function testDrawFloorLines() {
 function testDrawLadder() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     const x = 100;
     const y1 = 200;
     const y2 = 400;
@@ -91,7 +91,7 @@ function testDrawLadder() {
 function testDrawStickman() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     const x = 100;
     const y = 200;
     const height = 160;
@@ -133,7 +133,7 @@ function testDrawStickman() {
 function testDrawGame() {
     setupMockEnvironment();
 
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     logic.drawGame();
 
     const background = mockCtx.fillRectCalls[0];
@@ -170,7 +170,7 @@ function testDrawGame() {
 
 function testCrabWalkingAndClaws() {
     setupMockEnvironment();
-    const logic = require("../logic.js");
+    const logic = require("../resources/v1.0.1/logic.js");
     const crab = { x: 300, y: 200, width: 90, height: 60, isMoving: true };
     try {
         let firstStart = mockCtx.strokeCalls.length;
@@ -214,7 +214,7 @@ function testCrabWalkingAndClaws() {
 function testResizeCanvas() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     
     logic.resizeCanvas();
     

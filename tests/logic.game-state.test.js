@@ -10,7 +10,7 @@ function testGameInstructionsDisappearAfterTenSeconds() {
     };
 
     try {
-        require("../logic.js");
+        require("../resources/v1.0.1/logic.js");
         const timer = scheduledTimeouts[0];
         if (!timer || timer.delay !== 10000 || mockGameInstructions.hidden || mockGameInstructions.style.display !== "flex") {
             console.error("Test failed: instructions should remain visible until the 10-second timer");
@@ -31,7 +31,7 @@ function testGameInstructionsDisappearAfterTenSeconds() {
 
 function testIdlePauseAndResume() {
     setupMockEnvironment();
-    const logic = require("../logic.js");
+    const logic = require("../resources/v1.0.1/logic.js");
     logic.resizeCanvas();
     logic.player.x = 300;
     logic.keys.ArrowRight = true;
@@ -86,7 +86,7 @@ function testIdlePauseAndResume() {
 
 function testVictoryAtFifteenKills() {
     setupMockEnvironment();
-    const logic = require("../logic.js");
+    const logic = require("../resources/v1.0.1/logic.js");
     logic.resizeCanvas();
     logic.player.x = 200;
     logic.player.currentFloor = 2;
@@ -140,7 +140,7 @@ function testVictoryAtFifteenKills() {
 
 function testPlayerDamageImmunityAndGameOver() {
     setupMockEnvironment();
-    const logic = require("../logic.js");
+    const logic = require("../resources/v1.0.1/logic.js");
     logic.resizeCanvas();
     logic.player.x = 500;
     logic.player.currentFloor = 2;

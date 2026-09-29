@@ -3,7 +3,7 @@ const { setupMockEnvironment, teardownMockEnvironment } = require('./test-helper
 function testIsNearLadder() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     
     const testLadders = [
         { x: 100, y1: 200, y2: 400, width: 40 }
@@ -31,7 +31,7 @@ function testIsNearLadder() {
 function testIsOverLadder() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     
     const testLadders = [
         { x: 100, y1: 200, y2: 400, width: 40 }
@@ -59,7 +59,7 @@ function testIsOverLadder() {
 function testLadderPositioning() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     
     logic.resizeCanvas();
     
@@ -168,7 +168,7 @@ function testPlayerHeightAndFloorPositioning() {
 function testLadderFloor2ToFloor1Descending() {
     setupMockEnvironment();
     
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     logic.resizeCanvas();
     
     const sectionHeight = mockCanvas.height / 3;
@@ -240,7 +240,7 @@ function testLadderFloor2ToFloor1Descending() {
 function testSpacebarAttackAnimations() {
     setupMockEnvironment();
 
-    const logic = require('../logic.js');
+    const logic = require('../resources/v1.0.1/logic.js');
     logic.resizeCanvas();
     logic.player.x = 100;
     logic.player.direction = 'left';

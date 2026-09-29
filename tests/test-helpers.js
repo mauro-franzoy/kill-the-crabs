@@ -165,7 +165,7 @@ function teardownMockEnvironment() {
     delete global.requestAnimationFrame;
     delete global.canvas;
     delete global.ctx;
-    try { delete require.cache[require.resolve("../logic.js")]; } catch(e){}
+    try { delete require.cache[require.resolve("../resources/v1.0.1/logic.js")]; } catch(e){}
 }
 
 
